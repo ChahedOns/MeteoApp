@@ -3,7 +3,7 @@ import requests
 from flask import Flask, make_response, request, jsonify, render_template, send_file , url_for
 from flask_mongoengine import MongoEngine
 from mongoengine import EmbeddedDocumentListField, ReferenceField, EmbeddedDocumentField, ListField
-from APIConst import db_name, user_pwd, api_key,user_db
+from config import db_name, user_pwd, api_key,user_db
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 import json
 #from werkzeug.security import check_password_hash, generate_password_hash, safe_str_cmp
@@ -63,10 +63,24 @@ class weather(db.Document):
         }
 
 
+
+
+#NEEDS
+
 """def authenticate(mail, password):
     user = user.objects(mail=mail)
     if user and safe_str_cmp(user.pwd.encode('utf-8'), password.encode('utf-8')):
         return user  """
+
+
+def get_weather_data(api_key, city):
+    url = f'http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric'
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        return json.dumps(data, indent = 3)
+    else:
+        return None
 
 # App Routers
 @app.route("/")
@@ -96,14 +110,8 @@ def set_place():
         else:
             return make_response(jsonify("tous les cites sont : ", Ls), 200)
     
-def get_weather_data(api_key, city):
-    url = f'http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric'
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        return json.dumps(data, indent = 3)
-    else:
-        return None
+
+    
 
 @app.route("/weather", methods=["POST", 'GET'])
 def set_weather(city=None):
@@ -114,8 +122,7 @@ def set_weather(city=None):
         p = place.objects(name=city).first()
         if p == None:
             p=place(name=city,lat=data["coord"]["lat"],lon=data["coord"]["lon"])
-            p.save()
-        
+            p.save() 
         w.save()
         return make_response("Ajout du météo avec succées! ", 200)
         
