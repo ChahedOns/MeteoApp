@@ -8,6 +8,21 @@ from app import login_manager , routes_BP
 import json
 import requests
 
+# Needed functions
+
+def login_and_redirect(user):
+    """Logs in user, flashes welcome message and redirects to index"""
+    login_user(user)
+    flash(f"Welcome {user.username}!", category="success")
+    return make_response("login and redirect successfully!",200)
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load the user object from the user ID stored in the session"""
+    return User.objects(pk=user_id).first()
+
+
+    return "hello world"
 
 def get_weather_data(api_key, city):
     url = f'http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric'
@@ -54,3 +69,43 @@ def set_weather(city=None):
             p.save() 
         w.save()
         return make_response("Ajout du météo avec succées! ", 200)
+
+@routes_BP.route("/register", methods=["POST"])
+def register():
+    """Registers the user with username, email and password hash in database"""
+    logout_user()
+    password_hash = generate_password_hash(request.data.get("password"))
+    user = User(username=request.data.get("username"),name=request.data.get("name"),
+                email=request.data.get("mail"),password=password_hash,
+                birth_date=request.data.get("birthday"),location=request.data.get("location"))
+    user.save()
+    flash("Thanks for registering!", category="success")
+    return login_and_redirect(user)
+
+@routes_BP.route("/login", methods=["GET", "POST"])
+def login(data):
+    """Logs the user in through username/password"""
+    logout_user()
+    # Grab the user from a user model lookup
+    username_or_email = request.data.get("username")
+    if "@" in username_or_email:
+        user = User.objects(email=username_or_email).first()
+    else:
+        user = User.objects(username=username_or_email).first()
+
+
+    if user is not None and user.check_password(data.password):
+        # User validates (user object found and password for that
+        # user matched the password provided by the user)
+        return login_and_redirect(user)
+    else:
+        flash("(email or username)/password combination not found", category="error")
+        return make_response("ERROR WHILE LOGGIN ", 201)
+
+@routes_BP.route("/logout")
+@login_required
+def logout():
+    """Log out the current user"""
+    logout_user()
+    flash("You have logged out.", category="success")
+    return make_response("Login out succesfully", 200)
