@@ -1,4 +1,4 @@
-from flask import flash,make_response,redirect
+from flask import flash,make_response
 from models import User , Weather , Place
 from flask import Flask, make_response, request, jsonify, render_template, send_file , url_for
 from werkzeug.security import generate_password_hash ,check_password_hash
@@ -57,7 +57,6 @@ def set_place():
         else:
             return make_response(jsonify("tous les cites sont : ", Ls), 200)
     
-
 @routes_BP.route("/weather", methods=["POST", 'GET'])
 def set_weather(city=None):
     if request.method == "POST":
@@ -70,7 +69,6 @@ def set_weather(city=None):
             p.save() 
         w.save()
         return make_response("Ajout du météo avec succées! ", 200)
-
 
 @routes_BP.route("/register", methods=["POST"])
 def register():
