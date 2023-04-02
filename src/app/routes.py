@@ -23,7 +23,7 @@ def get_weather_data(api_key, city):
 @routes_BP.route("/cites", methods=["POST", 'GET'])
 def set_place():
     if request.method == "POST":
-        with open('../json/cities.json', 'r') as f:
+        with open('../../json/cities.json', 'r') as f:
             data = json.load(f)
             i = 0
             while i < len(data):
