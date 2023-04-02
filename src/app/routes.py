@@ -43,14 +43,14 @@ def set_place():
             return make_response(jsonify("tous les cites sont : ", Ls), 200)
     
 @routes_BP.route("/weather", methods=["POST", 'GET'])
-def set_weather(city=None):
+def set_weather():
     if request.method == "POST":
-        data= get_weather_data(api_key , city)
-        w= Weather(data=data,city=city)
+        data= get_weather_data(api_key , request.data.get("city"))
+        w= Weather(data=data,city=request.data.get("city"))
         #Check if the place exist in our data base! 
-        p = Place.objects(name=city).first()
+        p = Place.objects(name=request.data.get("city")).first()
         if p == None:
-            p=Place(name=city,lat=data["coord"]["lat"],lon=data["coord"]["lon"])
+            p=Place(name=request.data.get("city"),lat=data["coord"]["lat"],lon=data["coord"]["lon"])
             p.save() 
         w.save()
         return make_response("Ajout du météo avec succées! ", 200)
