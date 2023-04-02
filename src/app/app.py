@@ -1,4 +1,3 @@
-import requests
 from flask_login import LoginManager
 from flask import Flask, Blueprint
 from config import db_name, user_pwd,user_db
