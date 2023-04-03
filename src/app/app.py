@@ -2,7 +2,7 @@ from flask import Flask, Blueprint, session, make_response, request, jsonify
 from config import db_name, user_pwd,user_db
 from flask_mongoengine import MongoEngine
 from werkzeug.security import generate_password_hash ,check_password_hash
-from flask_login import current_user, login_user, logout_user, UserMixin,LoginManager
+from flask_login import current_user, login_required, login_user, logout_user, UserMixin,LoginManager
 from config import api_key, secret_key
 import json
 import requests
@@ -198,7 +198,7 @@ def set_weather():
         else:
             return make_response(jsonify("les meteos sauvgardées sont : ", Ls), 200)
 
-
+@login_required
 @app.route("/historique", methods=['GET'])
 def get_history():
         city = request.form.get("city")
@@ -207,7 +207,8 @@ def get_history():
             return make_response("Aucun Meteo sauvgardée pour cette ville", 201)
         else:
             return make_response(jsonify("L'Historique de météo de",city,"est : \n",E), 200)
-        
+
+@login_required
 @app.route("/forcast",methods=["get"])
 def get_forcast():
     city=request.form.get("city")
