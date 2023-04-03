@@ -86,7 +86,7 @@ def get_weather_data(api_key, city):
         return None
 
 def get_forcast_data(api_key,lat,lon):
-    url = f"api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={api_key}"
+    url = f"http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={api_key}"
     
     response = requests.get(url)
     if response.status_code == 200:
