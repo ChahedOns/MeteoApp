@@ -94,6 +94,15 @@ def get_forcast_data(api_key,lat,lon):
         return data
     else:
         return None
+    
+def get_city_data(api_key,city):
+    url= f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=5&appid={api_key}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        return data
+    else:
+        return None
 
 #Documents definitions
 
@@ -223,7 +232,52 @@ def get_forcast():
         forcast_data= get_forcast_data(api_key,lat,lon)
         return make_response(jsonify("forcast de la ville  ",city,"est : ", forcast_data), 200)
 
-        
+@app.route('/register', methods=['POST'])
+def register():
+    mail = request.form.get("mail")
+    name = request.form.get("name")
+    pwd = request.form.get("pwd")
+    birth_date = request.form.get("birth_date")
+    location = request.form.get("location")
+
+    existing_user = User.objects(mail=mail).first()
+    if existing_user is None:
+        hashpass = generate_password_hash(pwd, method='sha256')
+
+        u = User(mail=mail, pwd=hashpass, name=name, birth_date=birth_date,
+                        location=location)
+
+        max_id = 0      #assign an id to the user
+        for u in User.objects:
+            if u.id > max_id:
+                max_id = u.id
+        u.id = max_id + 1
+        u.save()
+        return make_response("Bienvenue à MeteoApp", 200)
+    else:
+        return make_response("Compte existant", 201)
+
+
+@app.route('/login', methods=['POST'])
+def login():
+    logout_user()
+    mail = request.form.get("mail")
+    pwd = request.form.get("pwd")
+
+    check_user = User.objects(mail=mail).first()
+    if not check_user:
+        return make_response("Mail invalide", 201)
+
+    # Vérifier que le mot de passe est correct
+    if not check_password_hash(check_user['pwd'], pwd):
+        return make_response("Mot de passe invalide", 201)
+    return login_user(check_user)
+
+@app.route('/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({'success': True}), 200       
 
     
     
