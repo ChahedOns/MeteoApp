@@ -230,12 +230,12 @@ def register():
         existing_user = User.objects(mail=mail).first()
         if existing_user is None:
             hashpass = generate_password_hash(pwd, method='sha256')
-            u = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location)
+            usr = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location)
             max_id = 0      #assign an id to the user
             for u in User.objects:
                 if u.id > max_id:
                     max_id = u.id
-            u.id = max_id + 1
+            usr.id = max_id + 1
             u.save()
             return make_response("Bienvenue à MeteoApp", 200)
         else:
