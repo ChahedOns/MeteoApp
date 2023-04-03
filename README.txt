@@ -1,11 +1,14 @@
 # MeteoApp
 #API entry points : 
+*********************** Welcome page ***********************
+http://127.0.0.1/
 *********************** Authentification ************************
 
 #Register : http://127.0.0.1:5000/register (method = post ) ( entry data -> form with 5 inputs : mail , name ,pwd , birth_date(yyyy-mm-dd) and location ( string) )
 #Login : http://127.0.0.1:5000/login (method = post)( entry data -> form : mail + pwd )
 #Logout : http://127.0.0.1:5000/logout (method = post)
 #Profile : http://127.0.0.1:5000/profile (method = post)
+
 
 ************************* Weather ******************************
 
