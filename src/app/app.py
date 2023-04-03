@@ -3,10 +3,10 @@ from flask import Flask, Blueprint
 from config import db_name, user_pwd,user_db
 from flask_mongoengine import MongoEngine
 from mongoengine import EmbeddedDocumentListField, ReferenceField, EmbeddedDocumentField, ListField
-from flask import Flask, make_response, request, jsonify, render_template, send_file , url_for
+from flask import Flask, make_response, request, jsonify, render_template, send_file , url_for , session
 from werkzeug.security import generate_password_hash ,check_password_hash
 from flask_login import current_user, login_required, login_user, logout_user
-from config import api_key
+from config import api_key , secret_key
 import json
 import requests
 from flask_login import UserMixin
@@ -57,7 +57,6 @@ def safe_string():
 
     return validation
 
-
 def unique_or_current_user_field(message=None):
     """Validates that a field is either equal to user's current field
     or doesn't exist in the database
@@ -105,31 +104,29 @@ def get_city_data(api_key,city):
         return None
 
 #Documents definitions
-
-class User(db.Document):
-    username = db.StringField(required=True, unique=True, max_length=40, index=True)
-    name = db.StringField(required=False, max_length=80, index=True)
-    email = db.EmailField(
-        unique=True, required=False, sparse=True, max_length=80, index=True
-    )
-    password = db.StringField(required=False, index=True)
-    birth_date = db.DateTimeField(required=True)
+class User(db.Document, UserMixin):
+    id = db.IntField(primary_key=True)
+    mail = db.StringField(required=True)
+    pwd= db.StringField(required=True)
+    name = db.StringField()
+    birth_date = db.DateTimeField()
     location=db.StringField(required=True)
-    
+
     def to_json(self):
         return {
-            "ID": self.ref,
+            "ID": self.id,
             "Mail":self.mail,
             "Name":self.name,
             "Birthday":self.birth_date,
-            "Location":self.location
+            "location":self.location
         }
+
     def check_password(self, password):
         """Checks that the pw provided hashes to the stored pw hash value"""
         return check_password_hash(self.password_hash, password)
     def __repr__(self):
             """Define what is printed for the user object"""
-            return f"Username: {self.username} id: {self.id}"
+            return f"Username: {self.username} id: {self.id}"  
     
 class Place(db.Document):
     name=db.StringField(required=True)
@@ -142,7 +139,6 @@ class Place(db.Document):
             "Lat":self.lat,
             "Lon":self.lon
         }
-
 class Weather(db.Document):
     data=db.DictField()
     date=db.DateField(default=datetime.datetime.now)
@@ -165,7 +161,6 @@ class History (db.Document):
             "City":self.city
         }
 
-
 # App Routers
 
 @app.route("/cities", methods=['POST', 'GET'])
@@ -181,7 +176,7 @@ def get_places():
     
 @app.route("/weather", methods=['POST', 'GET'])
 def set_weather():
-    if request.method == "POST":
+    if request.method == "GET":
         data= get_weather_data(api_key , request.form.get("city"))
         w= Weather(data=data,city=request.form.get("city"))
         h= History(city=request.form.get("city"),data=data)
@@ -193,14 +188,6 @@ def set_weather():
             p.save() 
         w.save()
         return make_response(jsonify("le meteo de la ville ",request.form.get("city"),"est : ", data), 200)
-    else : 
-        Ls = []
-        for r in Weather.objects(city=request.form.get("city")):
-            Ls.append(r)
-        if Ls == []:
-            return make_response("Aucun meteo sauvgardées dans le systéme!", 201)
-        else:
-            return make_response(jsonify("les meteos sauvgardées sont : ", Ls), 200)
 
 
 @app.route("/historique", methods=['GET'])
@@ -271,7 +258,9 @@ def login():
     # Vérifier que le mot de passe est correct
     if not check_password_hash(check_user['pwd'], pwd):
         return make_response("Mot de passe invalide", 201)
+   
     return login_user(check_user)
+
 
 @app.route('/logout', methods=['POST'])
 @login_required
@@ -280,10 +269,13 @@ def logout():
     return jsonify({'success': True}), 200       
 
     
-    
 @app.route("/", methods=['POST', 'GET'])
 def hello():
-    print("hello world!")
+    if "username" in session:
+        return make_response("you are logged in : Dashboard! ", 200)
+    else:
+        return make_response("Hello",201)
 
 if __name__ == '__main__':
     app.run()
+    app.secret_key = secret_key
