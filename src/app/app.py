@@ -1,18 +1,13 @@
-from flask_login import LoginManager
-from flask import Flask, Blueprint
+from flask import Flask, Blueprint, session, make_response, request, jsonify
 from config import db_name, user_pwd,user_db
 from flask_mongoengine import MongoEngine
-from mongoengine import EmbeddedDocumentListField, ReferenceField, EmbeddedDocumentField, ListField
-from flask import Flask, make_response, request, jsonify, render_template, send_file , url_for , session
 from werkzeug.security import generate_password_hash ,check_password_hash
-from flask_login import current_user, login_required, login_user, logout_user
-from config import api_key , secret_key
+from flask_login import current_user, login_user, logout_user, UserMixin,LoginManager
+from config import api_key, secret_key
 import json
 import requests
-from flask_login import UserMixin
 from werkzeug.security import check_password_hash
 import re
-from flask_login import current_user
 from wtforms import ValidationError
 import datetime
 
@@ -20,6 +15,8 @@ import datetime
 app = Flask(__name__)
 DB_URI ="mongodb+srv://admin:adminadmin@cluster0.ad4hkct.mongodb.net/MeteoApp?retryWrites=true&w=majority"
 app.config["MONGODB_HOST"] = DB_URI
+app.config['SECRET_KEY'] = secret_key
+
 app.config.update(dict(
     DEBUG=True,
     MAIL_SERVER='localhost',
@@ -36,6 +33,7 @@ routes_BP= Blueprint('routes', __name__)
 app.register_blueprint(routes_BP)
 # Login manager setup
 login_manager = LoginManager()
+login_manager.init_app(app)
 
 
 # Needed functions
@@ -56,6 +54,7 @@ def safe_string():
             raise ValidationError(message)
 
     return validation
+
 
 def unique_or_current_user_field(message=None):
     """Validates that a field is either equal to user's current field
@@ -85,7 +84,7 @@ def get_weather_data(api_key, city):
         return None
 
 def get_forcast_data(api_key,lat,lon):
-    url = f"http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={api_key}"
+    url = f"api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={api_key}"
     
     response = requests.get(url)
     if response.status_code == 200:
@@ -104,6 +103,7 @@ def get_city_data(api_key,city):
         return None
 
 #Documents definitions
+
 class User(db.Document, UserMixin):
     id = db.IntField(primary_key=True)
     mail = db.StringField(required=True)
@@ -111,22 +111,21 @@ class User(db.Document, UserMixin):
     name = db.StringField()
     birth_date = db.DateTimeField()
     location=db.StringField(required=True)
-
+    
     def to_json(self):
         return {
             "ID": self.id,
             "Mail":self.mail,
             "Name":self.name,
             "Birthday":self.birth_date,
-            "location":self.location
+            "Location":self.location
         }
-
     def check_password(self, password):
         """Checks that the pw provided hashes to the stored pw hash value"""
         return check_password_hash(self.password_hash, password)
     def __repr__(self):
             """Define what is printed for the user object"""
-            return f"Username: {self.username} id: {self.id}"  
+            return f"Username: {self.username} id: {self.id}"
     
 class Place(db.Document):
     name=db.StringField(required=True)
@@ -139,6 +138,7 @@ class Place(db.Document):
             "Lat":self.lat,
             "Lon":self.lon
         }
+
 class Weather(db.Document):
     data=db.DictField()
     date=db.DateField(default=datetime.datetime.now)
@@ -161,6 +161,7 @@ class History (db.Document):
             "City":self.city
         }
 
+
 # App Routers
 
 @app.route("/cities", methods=['POST', 'GET'])
@@ -176,7 +177,7 @@ def get_places():
     
 @app.route("/weather", methods=['POST', 'GET'])
 def set_weather():
-    if request.method == "GET":
+    if request.method == "POST":
         data= get_weather_data(api_key , request.form.get("city"))
         w= Weather(data=data,city=request.form.get("city"))
         h= History(city=request.form.get("city"),data=data)
@@ -188,9 +189,17 @@ def set_weather():
             p.save() 
         w.save()
         return make_response(jsonify("le meteo de la ville ",request.form.get("city"),"est : ", data), 200)
+    else : 
+        Ls = []
+        for r in Weather.objects(city=request.form.get("city")):
+            Ls.append(r)
+        if Ls == []:
+            return make_response("Aucun meteo sauvgardées dans le systéme!", 201)
+        else:
+            return make_response(jsonify("les meteos sauvgardées sont : ", Ls), 200)
 
 
-@app.route("/history", methods=['GET'])
+@app.route("/historique", methods=['GET'])
 def get_history():
         city = request.form.get("city")
         E = History.objects(city=city)
@@ -221,26 +230,32 @@ def get_forcast():
 
 @app.route('/register', methods=['POST'])
 def register():
-    if request.method == "POST":
-        mail = request.form.get("mail")
-        name = request.form.get("name")
-        pwd = request.form.get("pwd")
-        birth_date = request.form.get("birth_date")
-        location = request.form.get("location")
-        existing_user = User.objects(mail=mail).first()
-        if existing_user is None:
-            hashpass = generate_password_hash(pwd, method='sha256')
-            u = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location)
-            max_id = 0      #assign an id to the user
-            for u in User.objects:
-                if u.id > max_id:
-                    max_id = u.id
-            u.id = max_id + 1
-            u.save()
-            return make_response("Bienvenue à MeteoApp", 200)
-        else:
-            return make_response("Compte existant", 201)
+    mail = request.form.get("mail")
+    name = request.form.get("name")
+    pwd = request.form.get("pwd")
+    birth_date = request.form.get("birth_date")
+    location = request.form.get("location")
 
+    existing_user = User.objects(mail=mail).first()
+    if existing_user is None:
+        hashpass = generate_password_hash(pwd, method='sha256')
+
+        v = User(mail=mail, pwd=hashpass, name=name, birth_date=birth_date,
+                        location=location)
+
+        max_id = 0      #assign an id to the user
+        for u in User.objects:
+            if u.id > max_id:
+                max_id = u.id
+        v.id = max_id + 1
+        v.save()
+        return make_response("Bienvenue à MeteoApp", 200)
+    else:
+        return make_response("Compte existant", 201)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.objects(id=user_id).first
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -255,24 +270,35 @@ def login():
     # Vérifier que le mot de passe est correct
     if not check_password_hash(check_user['pwd'], pwd):
         return make_response("Mot de passe invalide", 201)
-   
-    return login_user(check_user)
 
+    # Set session data
+    session['user_id'] = check_user['id']
+
+    login_user(check_user)
+    return make_response("logged In successfully!", 200)
 
 @app.route('/logout', methods=['POST'])
-@login_required
 def logout():
     logout_user()
-    return jsonify({'success': True}), 200       
+    # Remove session data
+    session.pop('user_id', None)
+    return make_response("Logged out!", 200)   
 
     
+@app.route('/profile', methods=['POST'])
+def profile():
+    # Check if the user is logged in
+    if 'user_id' not in session:
+        return "<h1>Vous n'êtes pas connecté</h1>"
+
+    # Load the user's data from the database
+    user = User.objects(id=session['user_id']).first()
+
+    # Display the user's profile page
+    return f"<h1>Bonjour, {user.name}!</h1>"  
 @app.route("/", methods=['POST', 'GET'])
 def hello():
-    if "username" in session:
-        return make_response("you are logged in : Dashboard! ", 200)
-    else:
-        return make_response("Hello",201)
+    return"<h1>hello world<\h1>"
 
 if __name__ == '__main__':
     app.run()
-    app.secret_key = secret_key
