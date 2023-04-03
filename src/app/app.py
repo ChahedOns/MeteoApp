@@ -190,7 +190,7 @@ def set_weather():
         return make_response(jsonify("le meteo de la ville ",request.form.get("city"),"est : ", data), 200)
 
 
-@app.route("/historique", methods=['GET'])
+@app.route("/history", methods=['GET'])
 def get_history():
         city = request.form.get("city")
         E = History.objects(city=city)
@@ -221,28 +221,25 @@ def get_forcast():
 
 @app.route('/register', methods=['POST'])
 def register():
-    mail = request.form.get("mail")
-    name = request.form.get("name")
-    pwd = request.form.get("pwd")
-    birth_date = request.form.get("birth_date")
-    location = request.form.get("location")
-
-    existing_user = User.objects(mail=mail).first()
-    if existing_user is None:
-        hashpass = generate_password_hash(pwd, method='sha256')
-
-        u = User(mail=mail, pwd=hashpass, name=name, birth_date=birth_date,
-                        location=location)
-
-        max_id = 0      #assign an id to the user
-        for u in User.objects:
-            if u.id > max_id:
-                max_id = u.id
-        u.id = max_id + 1
-        u.save()
-        return make_response("Bienvenue à MeteoApp", 200)
-    else:
-        return make_response("Compte existant", 201)
+    if request.method == "POST":
+        mail = request.form.get("mail")
+        name = request.form.get("name")
+        pwd = request.form.get("pwd")
+        birth_date = request.form.get("birth_date")
+        location = request.form.get("location")
+        existing_user = User.objects(mail=mail).first()
+        if existing_user is None:
+            hashpass = generate_password_hash(pwd, method='sha256')
+            u = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location)
+            max_id = 0      #assign an id to the user
+            for u in User.objects:
+                if u.id > max_id:
+                    max_id = u.id
+            u.id = max_id + 1
+            u.save()
+            return make_response("Bienvenue à MeteoApp", 200)
+        else:
+            return make_response("Compte existant", 201)
 
 
 @app.route('/login', methods=['POST'])
