@@ -1,5 +1,5 @@
 # MeteoApp
-#API enty points : 
+#API entry points : 
 *********************** Authentification ************************
 
 #Register : http://127.0.0.1:5000/register (method = post ) ( entry data -> form with 5 inputs : mail , name ,pwd , birth_date(yyyy-mm-dd) and location ( string) )
