@@ -40,6 +40,7 @@ export default {
   border-top: 2px solid fade(black, 10);
   padding-top: 20px;
   .weather-item {
+    margin-left: 80px;
     display: flex;
     align-items: center;
     color: var(--darkColor);
