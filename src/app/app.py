@@ -222,11 +222,9 @@ def get_forcast():
     if p == "None":
         data= get_weather_data(api_key , city)
         w= Weather(data=data,city=request.form.get("city"))
-        h= History(city=request.form.get("city"),data=data)
         p=Place(name=request.form.get("city"),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
         p.save() 
         w.save()
-        h.save()
         forcast_data= get_forcast_data(api_key,float(data["coord"]["lat"]),float(data["coord"]["lon"]))
         return make_response(jsonify("forcast de la ville  ",city,"est : ", forcast_data), 200)
     else:
@@ -303,12 +301,11 @@ def profile():
 @login_required
 @app.route('/notifications',methods=['GET'])
 def get_notif():
-    user=User.objects(id=user_id).first
-    E = Notification.objects(id=user.id)
+    E = Notification.objects()
     if E == "None":
         return make_response("Aucune Notification sauvgardée pour cet utilisateur", 201)
     else:
-        return make_response(jsonify("Les notifications de ",user.name ,"sont : \n",E), 200)
+        return make_response(jsonify("Les notifications sont : \n",E), 200)
 
 # *********************************** KAFKA ************************
 producer = KafkaProducer(bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
