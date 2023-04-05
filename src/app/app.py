@@ -15,6 +15,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from kafka import KafkaProducer ,KafkaConsumer
 import requests
+import threading
+from confluent_kafka import Consumer, KafkaError
 
 
 # configurations !
@@ -125,14 +127,14 @@ class User(db.Document, UserMixin):
     name = db.StringField()
     birth_date = db.DateTimeField()
     location=db.StringField(required=True)
-    
+    cities = db.ListField(db.StringField())
     def to_json(self):
         return {
             "ID": self.id,
             "Mail":self.mail,
             "Name":self.name,
             "Birthday":self.birth_date,
-            "Location":self.location
+            "Location":self.location,
         }
     def check_password(self, password):
         """Checks that the pw provided hashes to the stored pw hash value"""
@@ -241,16 +243,24 @@ def register():
         pwd = request.form.get("pwd")
         birth_date = request.form.get("birth_date")
         location = request.form.get("location")
+        cities = request.form.get("cities").split(':')  # split the : separated list into a Python list --> city1:city2:city3....
         existing_user = User.objects(mail=mail).first()
         if existing_user is None:
+            if not get_city_data(api_key,location):#verification si location saisi par user est valide ou non
+                return make_response("location invalide", 201)
+            
+            for c in cities:
+                if not get_city_data(api_key,c):
+                    return make_response("location invalide", 201)
+                
             hashpass = generate_password_hash(pwd, method='sha256')
-            u = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location)
+            v = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location, cities=cities)
             max_id = 0      #assign an id to the user
             for u in User.objects:
                 if u.id > max_id:
                     max_id = u.id
-            u.id = max_id + 1
-            u.save()
+            v.id = max_id + 1
+            v.save()
             return make_response("Bienvenue à MeteoApp", 200)
         else:
             return make_response("Compte existant", 201)
@@ -264,7 +274,6 @@ def login():
     logout_user()
     mail = request.form.get("mail")
     pwd = request.form.get("pwd")
-
     check_user = User.objects(mail=mail).first()
     if not check_user:
         return make_response("Mail invalide", 201)
@@ -333,57 +342,66 @@ def produce_weather_data(topic, msg):
     print(f'Sent data to topic "{topic}": {msg}')
 
 def check_changes():
-    weather_data = get_weather_data(api_key, 'london')
-    if weather_data is not None:
-        weatherStatus= weather_data["weather"][0]["main"]
-        if weatherStatus == "snow":
-            msg = "Stay at home, drink something warm!"
-        elif weatherStatus == "rain" or weatherStatus=="shower rain" or weatherStatus=="thunderstorm":
-            msg = "Don't forget your umbrella! it may rains today!"
-        elif weatherStatus == "mist":
-            msg = "Becareful and drive slowly today!"
-        elif weatherStatus== "clouds":
-            msg="It may be a sad weather today! Be productive"
-        else:
-            msg=weatherStatus
-        print("Production with success!")
-        produce_weather_data('Notification',msg)
-
-    else:
-        print('Error retrieving weather data.')
-#launch the producer and consumer ! 
-while True:
-    check_changes()
-    time.sleep(15)
- 
-try:
     while True:
-        print("Listening")
-        # read single message at a time
-        consumer.subscribe(['Notification'])
-
-        for msg in consumer:
-            if msg is None:
-                print("msg vide")
-            if msg.error():
-                print("Error reading message : {}".format(msg.error()))
-                continue
+        weather_data = get_weather_data(api_key, "london")
+        if weather_data is not None:
+            weatherStatus= weather_data["weather"][0]["main"]
+            if weatherStatus == "snow":
+                msg = "Stay at home, drink something warm!"
+            elif weatherStatus == "rain" or weatherStatus=="shower rain" or weatherStatus=="thunderstorm":
+                msg = "Don't forget your umbrella! it may rains today!"
+            elif weatherStatus == "mist":
+                msg = "Becareful and drive slowly today!"
+            elif weatherStatus== "Clouds":
+                msg="It may be a sad weather today! Be productive"
             else:
-                print("consommation with success!")
-                n=Notification(msg=msg)
-                n.save()
-        # You can parse message and save to data base here
-            
-        consumer.commit()
+                msg=weatherStatus
+            print("Production with success!",msg)
+            produce_weather_data('Notification',msg)
+
+        else:
+            print('Error retrieving weather data.')
         time.sleep(15)
-except Exception as ex:
-    print("Kafka Exception : {}", ex)
+#launch the producer and consumer ! 
+"""while True:
+    check_changes()
+    time.sleep(15)"""
+def consume_notification():
+    try:
+        consumer.subscribe(['Notification'])
+        while True:
+            print("Listening")
+            # read single message at a time
 
-finally:
-    print("closing consumer")
-    consumer.close()
+            for msg in consumer:
+                if msg is None:
+                    print("msg vide")
+                if msg.error():
+                    print("Error reading message : {}".format(msg.error()))
+                    continue
+                else:
+                    print("consommation with success!")
+                    n=Notification(msg=msg)
+                    n.save()
+            # You can parse message and save to data base here
+                
+            consumer.commit()
+            time.sleep(15)
+    except Exception as ex:
+        print("Kafka Exception : {}", ex)
 
+    finally:
+        print("closing consumer")
+        consumer.close()
 
 
 if __name__ == '__main__':
+    consumer_thread = threading.Thread(target=consume_notification)
+    consumer_thread.start()
+
+    # start the producer in a separate thread
+    producer_thread = threading.Thread(target=check_changes)
+    producer_thread.start()
+
+    # start the Flask application
     app.run()
