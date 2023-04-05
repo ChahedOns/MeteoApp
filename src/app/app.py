@@ -1,3 +1,4 @@
+import time
 from flask import Flask, Blueprint, session, make_response, request, jsonify
 from config import db_name, user_pwd,user_db
 from flask_mongoengine import MongoEngine
@@ -10,12 +11,18 @@ from werkzeug.security import check_password_hash
 import re
 from wtforms import ValidationError
 import datetime
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from kafka import KafkaProducer ,KafkaConsumer
+import requests
+
 
 # configurations !
 app = Flask(__name__)
 DB_URI ="mongodb+srv://admin:adminadmin@cluster0.ad4hkct.mongodb.net/MeteoApp?retryWrites=true&w=majority"
 app.config["MONGODB_HOST"] = DB_URI
 app.config['SECRET_KEY'] = secret_key
+
 
 app.config.update(dict(
     DEBUG=True,
@@ -34,6 +41,13 @@ app.register_blueprint(routes_BP)
 # Login manager setup
 login_manager = LoginManager()
 login_manager.init_app(app)
+#schedular Setting : the one that will check the weather data frecuntly!
+# initialize scheduler
+SCHEDULER_API_ENABLED = True
+SCHEDULER_TIMEZONE = "Europe/Berlin"
+scheduler = BackgroundScheduler()
+scheduler.start()
+trigger = CronTrigger( year="*", month="*", day="*", hour="*", minute="2", second="5")
 
 
 # Needed functions
@@ -150,19 +164,13 @@ class Weather(db.Document):
             "City":self.city
         }
 
-class History (db.Document):
-    city=db.StringField()
-    data=db.DictField()
-    date=db.DateField(default=datetime.datetime.now)
-    def to_json(self):
-        return{
-            "Data": self.data,
-            "Date":self.date,
-            "City":self.city
-        }
 
+class Notification(db.Document):
+    msg=db.StringField()
+    date=db.DateField(default=datetime.datetime.now)
 
 # App Routers
+# needed user id later in the notifications system!
 
 @app.route("/cities", methods=['POST', 'GET'])
 def get_places():
@@ -180,8 +188,6 @@ def set_weather():
     if request.method == "POST":
         data= get_weather_data(api_key , request.form.get("city"))
         w= Weather(data=data,city=request.form.get("city"))
-        h= History(city=request.form.get("city"),data=data)
-        h.save()
         #Check if the place exist in our data base! 
         p = Place.objects(name=request.form.get("city")).first()
         if p == None:
@@ -201,12 +207,12 @@ def set_weather():
 @login_required
 @app.route("/historique", methods=['GET'])
 def get_history():
-        city = request.form.get("city")
-        E = History.objects(city=city)
-        if E == "None":
-            return make_response("Aucun Meteo sauvgardée pour cette ville", 201)
-        else:
-            return make_response(jsonify("L'Historique de météo de",city,"est : \n",E), 200)
+    city = request.form.get("city")
+    E = Weather.objects(city=city)
+    if E == "None":
+        return make_response("Aucun Meteo sauvgardée pour cette ville", 201)
+    else:
+        return make_response(jsonify("L'Historique de météo de",city,"est : \n",E), 200)
 
 @login_required
 @app.route("/forcast",methods=["get"])
@@ -282,7 +288,6 @@ def logout():
     session.pop('user_id', None)
     return make_response("Logged out!", 200)   
 
-    
 @app.route('/profile', methods=['POST'])
 def profile():
     # Check if the user is logged in
@@ -295,9 +300,93 @@ def profile():
     # Display the user's profile page
     return f"<h1>Bonjour, {user.name}!</h1>"  
 
-@app.route("/", methods=['POST', 'GET'])
-def hello():
-    return"<h1>hello world<\h1>"
+@login_required
+@app.route('/notifications',methods=['GET'])
+def get_notif():
+    user=User.objects(id=user_id).first
+    E = Notification.objects(id=user.id)
+    if E == "None":
+        return make_response("Aucune Notification sauvgardée pour cet utilisateur", 201)
+    else:
+        return make_response(jsonify("Les notifications de ",user.name ,"sont : \n",E), 200)
+
+# *********************************** KAFKA ************************
+producer = KafkaProducer(bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
+                        sasl_mechanism='PLAIN',
+                        security_protocol='SASL_SSL',
+                        sasl_plain_username='W2W37CHYQAEEQ55R',
+                        sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',
+                        api_version=(2, 7, 0))
+
+consumer = KafkaConsumer('Notification', group_id='CheckChangesGroup', bootstrap_servers =['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
+                        security_protocol='SASL_SSL', sasl_mechanism='PLAIN',
+                        sasl_plain_username='W2W37CHYQAEEQ55R',
+                        sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1')
+
+consumer.subscribe(['Notification'])
+
+def produce_weather_data(topic, msg):
+    # Convert dictionary to JSON string
+    json_str = json.dumps(msg)
+    # Encode JSON string as bytes
+    value_bytes = json_str.encode('utf-8')
+    # Send data to Kafka topic
+    producer.send(topic, value=value_bytes)
+    producer.flush()
+    print(f'Sent data to topic "{topic}": {msg}')
+
+def check_changes():
+    weather_data = get_weather_data(api_key, 'london')
+    if weather_data is not None:
+        weatherStatus= weather_data["weather"][0]["main"]
+        if weatherStatus == "snow":
+            msg = "Stay at home, drink something warm!"
+        elif weatherStatus == "rain" or weatherStatus=="shower rain" or weatherStatus=="thunderstorm":
+            msg = "Don't forget your umbrella! it may rains today!"
+        elif weatherStatus == "mist":
+            msg = "Becareful and drive slowly today!"
+        elif weatherStatus== "clouds":
+            msg="It may be a sad weather today! Be productive"
+        else:
+            msg=weatherStatus
+        print("Production with success!")
+        produce_weather_data('Notification',msg)
+
+    else:
+        print('Error retrieving weather data.')
+#launch the producer and consumer ! 
+while True:
+    check_changes()
+    time.sleep(15)
+ 
+try:
+    while True:
+        print("Listening")
+        # read single message at a time
+        consumer.subscribe(['Notification'])
+
+        for msg in consumer:
+            if msg is None:
+                print("msg vide")
+            if msg.error():
+                print("Error reading message : {}".format(msg.error()))
+                continue
+            else:
+                print("consommation with success!")
+                n=Notification(msg=msg)
+                n.save()
+        # You can parse message and save to data base here
+            
+        consumer.commit()
+        time.sleep(15)
+except Exception as ex:
+    print("Kafka Exception : {}", ex)
+
+finally:
+    print("closing consumer")
+    consumer.close()
+
+
 
 if __name__ == '__main__':
     app.run()
