@@ -157,7 +157,7 @@ class Place(db.Document):
 
 class Weather(db.Document):
     data=db.DictField()
-    date=db.DateField(default=datetime.datetime.now)
+    date=db.DateField(default=datetime.datetime.today())
     city=db.StringField()
     def to_json(self):
         return{
@@ -169,7 +169,8 @@ class Weather(db.Document):
 
 class Notification(db.Document):
     msg=db.StringField()
-    date=db.DateField(default=datetime.datetime.now)
+    location=db.StringField()
+    date=db.DateField(default=datetime.datetime.today())
 
 # App Routers
 # needed user id later in the notifications system!
@@ -197,7 +198,7 @@ def set_weather():
             p.save() 
         w.save()
         return make_response(jsonify("le meteo de la ville ",request.form.get("city"),"est : ", data), 200)
-    else : 
+    else :  
         Ls = []
         for r in Weather.objects(city=request.form.get("city")):
             Ls.append(r)
@@ -331,36 +332,47 @@ consumer = KafkaConsumer('Notification', group_id='CheckChangesGroup', bootstrap
 
 consumer.subscribe(['Notification'])
 
-def produce_weather_data(topic, msg):
+def produce_weather_data(topic, msg ,location):
     # Convert dictionary to JSON string
-    json_str = json.dumps(msg)
-    # Encode JSON string as bytes
-    value_bytes = json_str.encode('utf-8')
+    data={"msg":msg, 'location':location}
+    json_data = json.dumps(data)
+    data_bytes = json_data.encode('utf-8')
     # Send data to Kafka topic
-    producer.send(topic, value=value_bytes)
+    producer.send(topic, value=data_bytes)
     producer.flush()
     print(f'Sent data to topic "{topic}": {msg}')
 
 def check_changes():
     while True:
-        weather_data = get_weather_data(api_key, "london")
-        if weather_data is not None:
-            weatherStatus= weather_data["weather"][0]["main"]
-            if weatherStatus == "snow":
-                msg = "Stay at home, drink something warm!"
-            elif weatherStatus == "rain" or weatherStatus=="shower rain" or weatherStatus=="thunderstorm":
-                msg = "Don't forget your umbrella! it may rains today!"
-            elif weatherStatus == "mist":
-                msg = "Becareful and drive slowly today!"
-            elif weatherStatus== "Clouds":
-                msg="It may be a sad weather today! Be productive"
-            else:
-                msg=weatherStatus
-            print("Production with success!",msg)
-            produce_weather_data('Notification',msg)
+        ps= Place.objects()
+        for p in ps:
+            weather_data = get_weather_data(api_key, p.name)
+            if weather_data is not None:
+                #Prepare the msg! 
+                weatherStatus= weather_data["weather"][0]["main"]
+                if weatherStatus == "snow":
+                    msg = "Snowy Day Alert !Stay at home, drink something warm! Snowy Day!"
+                elif weatherStatus == "rain" or weatherStatus=="shower rain" or weatherStatus=="thunderstorm":
+                    msg = "Rainy Day Alert !Don't forget your umbrella! it may rains today!"
+                elif weatherStatus == "mist":
+                    msg = "Becareful and drive slowly today!"
+                elif weatherStatus== "clouds":
+                    msg="Grey Day Alert It may be a sad weather today! Be productive"
+                else:
+                    msg=weatherStatus
+                #Check the last notification on that location!
+                last_notif = Notification.objects(date=datetime.date.today(),location=p.name).first()
 
-        else:
-            print('Error retrieving weather data.')
+                if last_notif is not None:
+                    if msg != last_notif.msg:
+                        #Sending new notifiction with changes
+                        print("Detecting changes!")
+                        produce_weather_data('Notification',msg,p.name)
+                else:
+                    #Produce new notification! 
+                    produce_weather_data('Notification',msg,p.name)
+            else:
+                print('Error retrieving weather data.')
         time.sleep(15)
 #launch the producer and consumer ! 
 """while True:

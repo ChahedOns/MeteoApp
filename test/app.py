@@ -299,5 +299,43 @@ def profile():
 def hello():
     return"<h1>hello world<\h1>"
 
+#*************************** KAFKA ***************************
+
+import time
+from KAFKA.kafka import KafkaProducer
+import requests
+
+producer = KafkaProducer(bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
+                         sasl_mechanism='PLAIN',
+                         security_protocol='SASL_SSL',
+                         sasl_plain_username='W2W37CHYQAEEQ55R',
+                         sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',
+                         api_version=(2, 7, 0))
+
+
+def produce_weather_data(topic, weather_data):
+    # Convert dictionary to JSON string
+    json_str = json.dumps(weather_data)
+    # Encode JSON string as bytes
+    value_bytes = json_str.encode('utf-8')
+    # Send data to Kafka topic
+    producer.send(topic, value=value_bytes)
+    producer.flush()
+    print(f'Sent data to topic "{topic}": {weather_data}')
+while True:
+    weather_data = get_weather_data(api_key, 'london')
+    if weather_data is not None:
+        produce_weather_data('notification', weather_data)
+        print('Weather data produced to Kafka topic.')
+    else:
+        print('Error retrieving weather data.')
+    time.sleep(10) # sleep for 5 minutes
+
+    
+
+
+
+
+
 if __name__ == '__main__':
     app.run()
