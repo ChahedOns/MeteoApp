@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash ,check_password_hash
 from flask_login import current_user, login_required, login_user, logout_user, UserMixin,LoginManager
 from config import api_key, secret_key
 import json
+from json import loads
 import requests
 from werkzeug.security import check_password_hash
 import re
@@ -14,9 +15,9 @@ import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from kafka import KafkaProducer ,KafkaConsumer
+from confluent_kafka import Consumer
 import requests
 import threading
-from confluent_kafka import Consumer, KafkaError
 
 
 # configurations !
@@ -53,6 +54,7 @@ trigger = CronTrigger( year="*", month="*", day="*", hour="*", minute="2", secon
 
 
 # Needed functions
+
 
 def safe_string():
     """Validates that the field matches some safe requirements
@@ -157,7 +159,7 @@ class Place(db.Document):
 
 class Weather(db.Document):
     data=db.DictField()
-    date=db.DateField(default=datetime.datetime.today())
+    date=db.DateField(default=datetime.datetime.now())
     city=db.StringField()
     def to_json(self):
         return{
@@ -324,13 +326,10 @@ producer = KafkaProducer(bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluen
                         sasl_plain_username='W2W37CHYQAEEQ55R',
                         sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',
                         api_version=(2, 7, 0))
+consumer = KafkaConsumer ('Notification', group_id = 'group1',bootstrap_servers = ['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
+sasl_mechanism='PLAIN',security_protocol='SASL_SSL',sasl_plain_username='W2W37CHYQAEEQ55R',
+sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',auto_offset_reset = 'earliest')
 
-consumer = KafkaConsumer('Notification', group_id='CheckChangesGroup', bootstrap_servers =['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
-                        security_protocol='SASL_SSL', sasl_mechanism='PLAIN',
-                        sasl_plain_username='W2W37CHYQAEEQ55R',
-                        sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1')
-
-consumer.subscribe(['Notification'])
 
 def produce_weather_data(topic, msg ,location):
     # Convert dictionary to JSON string
@@ -380,27 +379,20 @@ def check_changes():
     time.sleep(15)"""
 def consume_notification():
     try:
-        consumer.subscribe(['Notification'])
         while True:
             print("Listening")
+            msg=consumer.poll()
             # read single message at a time
-
-            for msg in consumer:
-                if msg is None:
-                    print("msg vide")
-                if msg.error():
-                    print("Error reading message : {}".format(msg.error()))
-                    continue
-                else:
-                    print("consommation with success!")
-                    n=Notification(msg=msg)
-                    n.save()
+            if msg is None:
+                print("msg vide")
+            else:
+                print(msg)
             # You can parse message and save to data base here
                 
             consumer.commit()
-            time.sleep(15)
+            time.sleep(1)
     except Exception as ex:
-        print("Kafka Exception : {}", ex)
+        print(f"Kafka Exception : { ex}")
 
     finally:
         print("closing consumer")
@@ -408,12 +400,14 @@ def consume_notification():
 
 
 if __name__ == '__main__':
-    consumer_thread = threading.Thread(target=consume_notification)
-    consumer_thread.start()
+    
 
     # start the producer in a separate thread
     producer_thread = threading.Thread(target=check_changes)
     producer_thread.start()
+
+    consumer_thread = threading.Thread(target=consume_notification)
+    consumer_thread.start()
 
     # start the Flask application
     app.run()
