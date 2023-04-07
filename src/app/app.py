@@ -338,23 +338,24 @@ def produce_weather_data(topic, msg ,location):
     # Send data to Kafka topic
     producer.send(topic, value=data)
     producer.flush()
-    print(f'Sent data to topic "{topic}": {msg} , {location}')
+    print(f'Production processing on "{topic}": {msg} , {location}')
 
 def check_changes():
     while True:
+        #Check all the cities
         ps= Place.objects()
         for p in ps:
             weather_data = get_weather_data(api_key, p.name)
             if weather_data is not None:
                 #Prepare the msg! 
                 weatherStatus= weather_data["weather"][0]["main"]
-                if weatherStatus == "snow":
+                if weatherStatus == "Snow":
                     msg = "Snowy Day Alert !Stay at home, drink something warm! Snowy Day!"
-                elif weatherStatus == "rain" or weatherStatus=="shower rain" or weatherStatus=="thunderstorm":
+                elif weatherStatus == "Rain" or weatherStatus=="Shower Rain" or weatherStatus=="Thunderstorm":
                     msg = "Rainy Day Alert !Don't forget your umbrella! it may rains today!"
-                elif weatherStatus == "mist":
+                elif weatherStatus == "Mist":
                     msg = "Becareful and drive slowly today!"
-                elif weatherStatus== "clouds":
+                elif weatherStatus== "Clouds":
                     msg="Grey Day Alert It may be a sad weather today! Be productive"
                 else:
                     msg=weatherStatus
@@ -362,32 +363,34 @@ def check_changes():
                 last_notif = Notification.objects(date=datetime.date.today(),location=p.name).first()
 
                 if last_notif is not None:
+                    #There is changes!
                     if msg != last_notif.msg:
                         #Sending new notifiction with changes
                         print("Detecting changes!")
                         produce_weather_data('Check_notif',msg,p.name)
+                    else:
+                        pass
                 else:
                     #Produce new notification! 
                     produce_weather_data('Check_notif',msg,p.name)
             else:
                 print('Error retrieving weather data.')
         time.sleep(15)
-#launch the producer and consumer ! 
-"""while True:
-    check_changes()
-    time.sleep(15)"""
+
+
 def consume_notification():
     try:
         while True:
-            print("Listening")
+            print("Consuming processing ...")
             for message in consumer:
                 # read single message at a time
                 if message is None:
                     print("msg vide")
                 else:
-                # You can parse message and save to data base here
+                #Search all users that are interessted in that location
                     users= User.objects(location=message.value["location"])
                     for u in users:
+                        #Create for each user a new notification
                         n=Notification(user_id=u.id,msg=message.value["msg"],location=message.value["location"])
                         n.save()
             consumer.commit()
@@ -403,7 +406,7 @@ def consume_notification():
 if __name__ == '__main__':
     
 
-    # start the producer in a separate thread
+    # start the producer and consumer  in a separate threads
     producer_thread = threading.Thread(target=check_changes)
     producer_thread.start()
 
