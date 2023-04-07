@@ -93,7 +93,7 @@ class User(db.Document, UserMixin):
             return f"Username: {self.username} id: {self.id}"
     
 class Place(db.Document):
-    name=db.StringField(required=True)
+    name=db.StringField(required=True, primary_key=True)
     lat=db.FloatField()
     lon=db.FloatField()
 
@@ -302,7 +302,9 @@ def get_notif():
     Ls=[]
     for n in Notification.objects:
         if n.user_id==session['user_id']:
+            print("msg = ",n.msg)
             Ls.append(n.msg)
+            print("msg = ",n.msg)
     return make_response(jsonify("Les notifications sont : \n",Ls), 200)
 
 
@@ -384,7 +386,7 @@ def consume_notification():
                         #Create for each user a new notification 
                         #Specific notification for the user's location 
                         if u.location == message.value["location"]:
-                            n=Notification(user_id=u.id,msg=message.value["location"],location=message.value["location"])
+                            n=Notification(user_id=u.id,msg=message.value["msg"],location=message.value["location"])
                             n.save()
                          #Specific notification for the user's favorite cities 
                         else:
