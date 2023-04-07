@@ -19,6 +19,7 @@ http://127.0.0.1/
   #Get forcast weather of a specific city : http://127.0.0.1:5000/forcast ( method=POST) entry data -> form 1input : city (string 
 
 *********************** Notification ********************************
-
+#To use this API you should be logged in :
+  #Receive alerts regarding weather conditions for cities that are of interest to the user: http://127.0.0.1:5000/notifications ( method=GET)
 
 
