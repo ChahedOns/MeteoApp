@@ -41,43 +41,6 @@ login_manager.init_app(app)
 
 # Needed functions
 
-
-def safe_string():
-    """Validates that the field matches some safe requirements
-    Used to make sure our user's username is safe and readable
-    Requirements:
-    - contains only letters, numbers, dashes and underscores
-    """
-
-    def validation(form, field):
-        string = field.data.lower()
-        pattern = re.compile(r"^[a-z0-9_-]+$")
-        match = pattern.match(string)
-        if not match:
-            message = "Must contain only letters, numbers, dashes and underscores."
-            raise ValidationError(message)
-
-    return validation
-
-
-def unique_or_current_user_field(message=None):
-    """Validates that a field is either equal to user's current field
-    or doesn't exist in the database
-    Used for username and email fields
-    """
-
-    def validation(form, field):
-        kwargs = {field.name: field.data}
-        if (
-            hasattr(current_user, field.name)
-            and getattr(current_user, field.name) == field.data
-        ):
-            return
-        if User.objects(**kwargs).first():
-            raise ValidationError(message)
-
-    return validation
-
 def get_weather_data(api_key, city):
     url = f'http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric'
     response = requests.get(url)
@@ -154,15 +117,19 @@ class Weather(db.Document):
             "City":self.city
         }
 
-
 class Notification(db.Document):
     user_id=db.IntField()
     msg=db.StringField()
     location=db.StringField()
     date=db.DateField(default=datetime.datetime.today())
 
+class History(db.Document):
+    user_id=db.IntField()
+    data=db.DictField()
+    city=db.StringField()
+    date=db.DateField(default=datetime.datetime.today())
 # App Routers
-# needed user id later in the notifications system!
+
 
 @app.route("/cities", methods=['POST', 'GET'])
 def get_places():
@@ -178,9 +145,13 @@ def get_places():
 @app.route("/weather", methods=['POST', 'GET'])
 def set_weather():
     if request.method == "POST":
+    
         data= get_weather_data(api_key , request.form.get("city"))
+        #Add the searched weather to the user history 
         w= Weather(data=data,city=request.form.get("city"))
-        #Check if the place exist in our data base! 
+        h=History(user_id=session['user_id'],data=data,city=request.form.get("city"))
+        h.save()
+        #Check if the place exist in our data base ! (needed later in the notifications system) 
         p = Place.objects(name=request.form.get("city")).first()
         if p == None:
             p=Place(name=request.form.get("city"),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
@@ -197,20 +168,33 @@ def set_weather():
             return make_response(jsonify("les meteos sauvgardées sont : ", Ls), 200)
 
 @login_required
-@app.route("/historique", methods=['GET'])
+@app.route("/historique", methods=['GET','POST'])
 def get_history():
-    city = request.form.get("city")
-    E = Weather.objects(city=city)
-    if E == "None":
-        return make_response("Aucun Meteo sauvgardée pour cette ville", 201)
+    #Get the History of a specific city
+    if request.method == "POST":
+        city=request.form.get("city")
+        u=User.objects(id=session['user_id']).first
+        hs = History.objects(user_id=u.id, city=city)
+        if hs == "None":
+            return make_response("Aucun Meteo sauvgardée pour cette ville", 201)
+        else:
+            return make_response(jsonify("L'Historique de météo de",city,"est : \n",hs), 200)
     else:
-        return make_response(jsonify("L'Historique de météo de",city,"est : \n",E), 200)
+    #Get all the user's history 
+        u=User.objects(id=session['user_id']).first
+        hs= History.objects(user_id=u.id)
+        if hs == "None":
+            return make_response("Aucun Historique pour vous", 201)
+        else:
+            return make_response(jsonify("L'Historique de météo est : \n", hs), 200)
+
 
 @login_required
 @app.route("/forcast",methods=["get"])
 def get_forcast():
     city=request.form.get("city")
     p= Place.objects(name=city).first()
+    #si le cité en question n'existe pas dans la base on l'ajout de plus son meteo courant et on recupére son forcast!
     if p == "None":
         data= get_weather_data(api_key , city)
         w= Weather(data=data,city=request.form.get("city"))
@@ -220,6 +204,7 @@ def get_forcast():
         forcast_data= get_forcast_data(api_key,float(data["coord"]["lat"]),float(data["coord"]["lon"]))
         return make_response(jsonify("forcast de la ville  ",city,"est : ", forcast_data), 200)
     else:
+        #Si ca existe ! on affiche son forcast directement
         lat=p.lat
         lon =p.lon
         forcast_data= get_forcast_data(api_key,lat,lon)
