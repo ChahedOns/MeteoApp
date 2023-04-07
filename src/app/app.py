@@ -8,8 +8,6 @@ from config import api_key, secret_key
 import json
 import requests
 from werkzeug.security import check_password_hash
-import re
-from wtforms import ValidationError
 import datetime
 from kafka import KafkaProducer ,KafkaConsumer
 import requests
