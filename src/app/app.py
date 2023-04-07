@@ -163,7 +163,14 @@ def set_weather():
         if Ls == []:
             return make_response("Aucun meteo sauvgardées dans le systéme!", 201)
         else:
-            return make_response(jsonify("les meteos sauvgardées sont : ", Ls), 200)
+                        now = datetime.datetime.now()
+                        today =now.strftime('%d')
+                        for data in Ls:
+                            date_str = data['date']
+                            d = date_str.strftime('%d')
+                            if int(today) - int(d) <= 15:
+                                print("temperature : ", data['data'],"  date : ", data['date'])
+                        return make_response(jsonify("success"), 200)
 
 @login_required
 @app.route("/historique", methods=['GET','POST'])
@@ -283,11 +290,11 @@ def profile():
 @login_required
 @app.route('/notifications',methods=['GET'])
 def get_notif():
-    E = Notification.objects()
-    if E == "None":
-        return make_response("Aucune Notification sauvgardée pour cet utilisateur", 201)
-    else:
-        return make_response(jsonify("Les notifications sont : \n",E), 200)
+    Ls=[]
+    for n in Notification.objects:
+        if n.user_id==session['user_id']:
+            Ls.append(n.msg)
+    return make_response(jsonify("Les notifications sont : \n",Ls), 200)
 
 
 
