@@ -10,12 +10,14 @@ import requests
 from werkzeug.security import check_password_hash
 import datetime
 from kafka import KafkaProducer ,KafkaConsumer
+from flask_cors import CORS
 import requests
 import threading
 
 
 # configurations !
 app = Flask(__name__)
+CORS(app)
 DB_URI ="mongodb+srv://admin:adminadmin@cluster0.ad4hkct.mongodb.net/MeteoApp?retryWrites=true&w=majority"
 app.config["MONGODB_HOST"] = DB_URI
 app.config['SECRET_KEY'] = secret_key
@@ -76,7 +78,7 @@ class User(db.Document, UserMixin):
     name = db.StringField()
     birth_date = db.DateTimeField()
     location=db.StringField(required=True)
-    cities = db.ListField(db.StringField())
+    cities = db.ListField()
     def to_json(self):
         return {
             "ID": self.id,
@@ -139,15 +141,21 @@ def get_places():
             return make_response("Aucun cite dans le systéme!", 201)
         else:
             return make_response(jsonify("tous les cites sont : ", Ls), 200)
-    
+
 @app.route("/weather", methods=['POST', 'GET'])
 def set_weather():
     if request.method == "POST":
+        # Check if the user is logged in
+        if 'user_id' not in session:
+            return make_response("you should be logged in", 201)
+
+        # Load the user's data from the database
+        user = User.objects(id=session['user_id']).first()
     
         data= get_weather_data(api_key , request.form.get("city"))
         #Add the searched weather to the user history 
         w= Weather(data=data,city=request.form.get("city"))
-        h=History(user_id=session['user_id'],data=data,city=request.form.get("city"))
+        h=History(user_id=user.id,data=data,city=request.form.get("city"))
         h.save()
         #Check if the place exist in our data base ! (needed later in the notifications system) 
         p = Place.objects(name=request.form.get("city")).first()
@@ -225,21 +233,13 @@ def register():
         location = request.form.get("location")
         cities = request.form.get("cities").split(':')  # split the : separated list into a Python list --> city1:city2:city3....
         existing_user = User.objects(mail=mail).first()
+        print(cities)
         #Adding all the cities and location to place class 
         if existing_user is None:
             data=get_city_data(api_key,location)
             if not data: #verification si location saisi par user est valide ou non
                 return make_response("location invalide", 201)
-            else:
-                p=Place(name=location,lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
-                p.save()
-            for c in cities:
-                data=get_city_data(api_key,c)
-                if not data:
-                    return make_response("location invalide", 201)
-                else:
-                    p=Place(name=c,lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
-                    p.save()
+
 
                 
             hashpass = generate_password_hash(pwd, method='sha256')
@@ -273,6 +273,7 @@ def login():
 
     # Set session data
     session['user_id'] = check_user['id']
+    print(session['user_id'])
 
     login_user(check_user)
     return make_response("logged In successfully!", 200)

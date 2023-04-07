@@ -60,6 +60,8 @@ export default {
               this.responseMessage = response.data;
               this.showSuccessMessage = true;
               this.$emit('login-status-changed', true);
+              this.getData();
+
             }
             console.log(this.isLoggedIn);
           })
@@ -74,6 +76,20 @@ export default {
               this.$emit('login-failed', false);
             });
           });
+    },
+    getData(){
+      axios.post('http://127.0.0.1:5000/profile')
+      .then(response => {
+        if (response.status ===200){
+          this.responseMessage = response.data;
+          console.log(this.responseMessage)
+        }
+      })
+      .catch( error => {
+        console.error(error);
+        this.responseMessage = error.response.data;
+
+      })
     },
     closeModal() {
       this.showLoginModal = false;

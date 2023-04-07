@@ -31,6 +31,7 @@
         </div>
       </div>
     </transition>
+
     <WeatherAnimate />
   </div>
 </template>
@@ -47,6 +48,7 @@ import WeekChart from "@/components/WeekChart";
 import LogIn from "@/components/LogIn";
 import SignUp from "@/components/SignUp";
 import axios from "axios";
+
 
 
 export default {

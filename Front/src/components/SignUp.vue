@@ -24,6 +24,10 @@
           <input type="text" id="signup-location" name="location" required>
         </div>
         <div>
+          <label for="signup-cities">Cities (separated by a colon ':'):</label>
+          <input type="text" id="signup-cities" name="cities" required>
+        </div>
+        <div>
           <p v-if="responseMessage" class="error-message">{{responseMessage}}</p>
         </div>
         <div>
