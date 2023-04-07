@@ -320,26 +320,24 @@ def get_notif():
         return make_response(jsonify("Les notifications sont : \n",E), 200)
 
 # *********************************** KAFKA ************************
-producer = KafkaProducer(bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
+producer = KafkaProducer(value_serializer=lambda m: json.dumps(m).encode('utf-8'),bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
                         sasl_mechanism='PLAIN',
                         security_protocol='SASL_SSL',
                         sasl_plain_username='W2W37CHYQAEEQ55R',
                         sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',
                         api_version=(2, 7, 0))
-consumer = KafkaConsumer ('Notification', group_id = 'group1',bootstrap_servers = ['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
+consumer = KafkaConsumer ('Check_notif', group_id = 'group1',bootstrap_servers = ['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
 sasl_mechanism='PLAIN',security_protocol='SASL_SSL',sasl_plain_username='W2W37CHYQAEEQ55R',
-sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',auto_offset_reset = 'earliest')
-
+sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',auto_offset_reset = 'earliest',value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+consumer.subscribe(['Check_notif'])
 
 def produce_weather_data(topic, msg ,location):
-    # Convert dictionary to JSON string
-    data={"msg":msg, 'location':location}
-    json_data = json.dumps(data)
-    data_bytes = json_data.encode('utf-8')
+    # Convert data to dictionary
+    data={"msg":msg, "location":location}
     # Send data to Kafka topic
-    producer.send(topic, value=data_bytes)
+    producer.send(topic, value=data)
     producer.flush()
-    print(f'Sent data to topic "{topic}": {msg}')
+    print(f'Sent data to topic "{topic}": {msg} , {location}')
 
 def check_changes():
     while True:
@@ -366,10 +364,10 @@ def check_changes():
                     if msg != last_notif.msg:
                         #Sending new notifiction with changes
                         print("Detecting changes!")
-                        produce_weather_data('Notification',msg,p.name)
+                        produce_weather_data('Check_notif',msg,p.name)
                 else:
                     #Produce new notification! 
-                    produce_weather_data('Notification',msg,p.name)
+                    produce_weather_data('Check_notif',msg,p.name)
             else:
                 print('Error retrieving weather data.')
         time.sleep(15)
@@ -381,14 +379,13 @@ def consume_notification():
     try:
         while True:
             print("Listening")
-            msg=consumer.poll()
+            message=consumer.poll(1)
             # read single message at a time
-            if msg is None:
+            if message is None:
                 print("msg vide")
             else:
-                print(msg)
             # You can parse message and save to data base here
-                
+                print(message["value"])
             consumer.commit()
             time.sleep(1)
     except Exception as ex:
