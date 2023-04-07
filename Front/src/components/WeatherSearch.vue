@@ -14,6 +14,7 @@
 
 <script>
 import { mapActions, mapGetters } from "vuex";
+import axios from "axios";
 export default {
   data() {
     return {
@@ -28,6 +29,17 @@ export default {
     getData() {
       this.fetchWeatherData(this.search);
       this.fetchForecastData(this.search);
+      //Search thang
+      axios.post('http://127.0.0.1:5000/weather', {
+        city: this.search
+      })
+      .then(response => {
+        console.log(response.data)
+      })
+      .catch(error => {
+        console.log(error.response.data)
+      })
+
     }
   },
 
