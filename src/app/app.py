@@ -170,6 +170,7 @@ class Weather(db.Document):
 
 
 class Notification(db.Document):
+    user_id=db.IntField()
     msg=db.StringField()
     location=db.StringField()
     date=db.DateField(default=datetime.datetime.today())
@@ -379,13 +380,16 @@ def consume_notification():
     try:
         while True:
             print("Listening")
-            message=consumer.poll(1)
-            # read single message at a time
-            if message is None:
-                print("msg vide")
-            else:
-            # You can parse message and save to data base here
-                print(message["value"])
+            for message in consumer:
+                # read single message at a time
+                if message is None:
+                    print("msg vide")
+                else:
+                # You can parse message and save to data base here
+                    users= User.objects(location=message.value["location"])
+                    for u in users:
+                        n=Notification(user_id=u.id,msg=message.value["msg"],location=message.value["location"])
+                        n.save()
             consumer.commit()
             time.sleep(1)
     except Exception as ex:
