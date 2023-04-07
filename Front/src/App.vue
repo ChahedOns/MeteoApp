@@ -6,15 +6,28 @@
         <WeatherMain />
         <WeatherInfo />
         <WeekChart :forecastData="getForecastData"/>
-        <button  @click="toggleLoginSignupModal">Login / Sign Up</button>
+        <div class="button-container">
+          <button v-if="!isLoggedIn " @click="toggleLoginModal" class="login">Log In</button>
+          <button v-if="!isLoggedIn " @click="toggleSignupModal" class="signup">Sign Up</button>
+          <button v-if="isLoggedIn " @click="logout">Log Out</button>
+        </div>
+
       </div>
     </transition>
     <transition name="fade" mode="out-in">
-      <div v-if="showLoginSignup" class="modal-wrapper">
-        <div class="modal-backdrop" @click="toggleLoginSignupModal"></div>
+      <div v-if="showLogin" class="modal-wrapper">
+        <div class="modal-backdrop" @click="toggleLoginModal"></div>
         <div class="modal-content">
-          <LoginSignup />
-          <button @click="toggleLoginSignupModal">Close</button>
+          <LogIn :isLoggedIn="isLoggedIn" @close="handleCloseLogInModal" @login-status-changed="isLoggedIn = $event"  @login-failed="isLoggedIn = false"/>
+        </div>
+      </div>
+    </transition>
+
+    <transition name="fade" mode="out-in">
+      <div v-if="showSignup" class="modal-wrapper">
+        <div class="modal-backdrop" @click="toggleSignupModal"></div>
+        <div class="modal-content">
+          <SignUp  @close="handleCloseSignUpModal"/>
         </div>
       </div>
     </transition>
@@ -30,7 +43,12 @@ import WeatherInfo from "@/components/WeatherInfo";
 import WeatherAnimate from "@/components/WeatherAnimate";
 import { mapGetters, mapActions } from "vuex";
 import WeekChart from "@/components/WeekChart";
-import LoginSignup from "@/components/LoginSignup";
+
+import LogIn from "@/components/LogIn";
+import SignUp from "@/components/SignUp";
+import axios from "axios";
+
+
 export default {
   name: "App",
   components: {
@@ -39,12 +57,16 @@ export default {
     WeatherMain,
     WeatherInfo,
     WeatherAnimate,
-    LoginSignup
+    LogIn,
+    SignUp,
+
   },
   data() {
     return {
-      showLoginSignup: false,
-      showButton: true
+      showSignup: false,
+      showLogin: false,
+      showButton: true,
+      isLoggedIn: false
     };
   },
   computed: {
@@ -56,18 +78,51 @@ export default {
       await this.fetchWeatherData(this.$store.state.defaultSearch);
       await this.fetchForecastData(this.$store.state.defaultSearch);
     },
-    toggleLoginSignupModal() {
-      this.showLoginSignup = !this.showLoginSignup;
+
+    toggleLoginModal(){
+      this.showLogin = !this.showLogin;
       this.showButton = false;
-    }
+    },
+    toggleSignupModal(){
+      this.showSignup = !this.showSignup;
+      this.showButton = false;
+    },
+    handleCloseLogInModal() {
+      this.showLogin = false;
+      this.showButton = true;
+    },
+    handleCloseSignUpModal() {
+      this.showSignup = false;
+      this.showButton = true;
+    },
+    logout() {
+      axios.post('http://127.0.0.1:5000/logout')
+          .then(response => {
+            // Handle successful logout
+            localStorage.removeItem('token');
+            this.isLoggedIn = false;
+            this.responseMessage = response.data;
+            console.log(response.data);
+          })
+          .catch(error => {
+            // Handle logout error
+            console.error(error);
+            this.responseMessage = error.response.data
+          });
+    },
+
+
   },
 
   created() {
+    const token = localStorage.getItem('token');
+    if (token) {
+      this.isLoggedIn = true;
+    }
     this.initData();
   }
 };
 </script>
-
 <style lang="less">
 @import url("https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,700;0,800;0,900;1,300;1,500&display=swap");
 :root {
@@ -156,23 +211,42 @@ body {
   padding: 20px;
   border-radius: 10px;
 }
-
 button {
-  padding: 10px;
-  margin: 10px;
-  border-radius: 10px;
-  font-size: 16px;
-  font-weight: bold;
-  color: #fff;
-  background-color: var(--darkColor);
+  background-color: #4CAF50;
   border: none;
+  color: white;
+  padding: 10px 20px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  border-radius: 5px;
   cursor: pointer;
-  transition: all 0.3s ease-in-out;
-
-  &:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
-  }
+  margin-right: 10px;
 }
+
+button:hover {
+  background-color: #3e8e41;
+}
+
+button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #ddd;
+}
+
+
+button.login, button.signup {
+  background-color: #2196F3;
+}
+
+button.login:hover, button.signup:hover {
+  background-color: #0b7dda;
+}
+.button-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
 
 </style>
