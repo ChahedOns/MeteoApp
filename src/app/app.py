@@ -218,13 +218,22 @@ def register():
         location = request.form.get("location")
         cities = request.form.get("cities").split(':')  # split the : separated list into a Python list --> city1:city2:city3....
         existing_user = User.objects(mail=mail).first()
+        #Adding all the cities and location to place class 
         if existing_user is None:
-            if not get_city_data(api_key,location):#verification si location saisi par user est valide ou non
+            data=get_city_data(api_key,location)
+            if not data: #verification si location saisi par user est valide ou non
                 return make_response("location invalide", 201)
-            
+            else:
+                p=Place(name=location,lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
+                p.save()
             for c in cities:
-                if not get_city_data(api_key,c):
+                data=get_city_data(api_key,c)
+                if not data:
                     return make_response("location invalide", 201)
+                else:
+                    p=Place(name=c,lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
+                    p.save()
+
                 
             hashpass = generate_password_hash(pwd, method='sha256')
             v = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location, cities=cities)
