@@ -6,16 +6,12 @@ from werkzeug.security import generate_password_hash ,check_password_hash
 from flask_login import current_user, login_required, login_user, logout_user, UserMixin,LoginManager
 from config import api_key, secret_key
 import json
-from json import loads
 import requests
 from werkzeug.security import check_password_hash
 import re
 from wtforms import ValidationError
 import datetime
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
 from kafka import KafkaProducer ,KafkaConsumer
-from confluent_kafka import Consumer
 import requests
 import threading
 
@@ -38,20 +34,10 @@ app.config.update(dict(
 #Database setup
 db = MongoEngine()
 db.init_app(app)
-#Blueprint setup
-routes_BP= Blueprint('routes', __name__)
-app.register_blueprint(routes_BP)
+
 # Login manager setup
 login_manager = LoginManager()
 login_manager.init_app(app)
-#schedular Setting : the one that will check the weather data frecuntly!
-# initialize scheduler
-SCHEDULER_API_ENABLED = True
-SCHEDULER_TIMEZONE = "Europe/Berlin"
-scheduler = BackgroundScheduler()
-scheduler.start()
-trigger = CronTrigger( year="*", month="*", day="*", hour="*", minute="2", second="5")
-
 
 # Needed functions
 
@@ -320,7 +306,10 @@ def get_notif():
     else:
         return make_response(jsonify("Les notifications sont : \n",E), 200)
 
-# *********************************** KAFKA ************************
+
+
+# ******************** KAFKA ************************
+#Kafka-confluent Configs 
 producer = KafkaProducer(value_serializer=lambda m: json.dumps(m).encode('utf-8'),bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
                         sasl_mechanism='PLAIN',
                         security_protocol='SASL_SSL',
@@ -328,10 +317,12 @@ producer = KafkaProducer(value_serializer=lambda m: json.dumps(m).encode('utf-8'
                         sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',
                         api_version=(2, 7, 0))
 consumer = KafkaConsumer ('Check_notif', group_id = 'group1',bootstrap_servers = ['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
-sasl_mechanism='PLAIN',security_protocol='SASL_SSL',sasl_plain_username='W2W37CHYQAEEQ55R',
-sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',auto_offset_reset = 'earliest',value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+                        sasl_mechanism='PLAIN',security_protocol='SASL_SSL',sasl_plain_username='W2W37CHYQAEEQ55R',
+                        sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',auto_offset_reset = 'earliest',value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+
 consumer.subscribe(['Check_notif'])
 
+#The producer function 
 def produce_weather_data(topic, msg ,location):
     # Convert data to dictionary
     data={"msg":msg, "location":location}
@@ -340,6 +331,7 @@ def produce_weather_data(topic, msg ,location):
     producer.flush()
     print(f'Production processing on "{topic}": {msg} , {location}')
 
+#The con job function 
 def check_changes():
     while True:
         #Check all the cities
@@ -377,7 +369,7 @@ def check_changes():
                 print('Error retrieving weather data.')
         time.sleep(15)
 
-
+#The consumer function 
 def consume_notification():
     try:
         while True:
@@ -388,11 +380,19 @@ def consume_notification():
                     print("msg vide")
                 else:
                 #Search all users that are interessted in that location
-                    users= User.objects(location=message.value["location"])
+                    users= User.objects()
                     for u in users:
-                        #Create for each user a new notification
-                        n=Notification(user_id=u.id,msg=message.value["msg"],location=message.value["location"])
-                        n.save()
+                        #Create for each user a new notification 
+                        #Specific notification for the user's location 
+                        if u.location == message.value["location"]:
+                            n=Notification(user_id=u.id,msg=message.value["location"],location=message.value["location"])
+                            n.save()
+                         #Specific notification for the user's favorite cities 
+                        else:
+                            for city in u.cities:
+                                if city == message.value["location"]: 
+                                    n=Notification(user_id=u.id,msg=message.value["msg"],location=city)
+                                    n.save()
             consumer.commit()
             time.sleep(1)
     except Exception as ex:
@@ -404,12 +404,10 @@ def consume_notification():
 
 
 if __name__ == '__main__':
-    
 
     # start the producer and consumer  in a separate threads
     producer_thread = threading.Thread(target=check_changes)
     producer_thread.start()
-
     consumer_thread = threading.Thread(target=consume_notification)
     consumer_thread.start()
 
