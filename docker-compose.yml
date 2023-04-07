@@ -2,7 +2,7 @@ version: '3.4'
 
 services:
   meteoapp:
-    image: meteoapp
+    image: meteoappbackend
     build:
       context: .
       dockerfile: ./Dockerfile
