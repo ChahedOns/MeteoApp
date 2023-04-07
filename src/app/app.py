@@ -143,18 +143,20 @@ def get_places():
 @app.route("/weather", methods=['POST', 'GET'])
 def set_weather():
     if request.method == "POST":
-    
-        data= get_weather_data(api_key , request.form.get("city"))
-        #Add the searched weather to the user history 
-        w= Weather(data=data,city=request.form.get("city"))
-        h=History(user_id=session['user_id'],data=data,city=request.form.get("city"))
-        h.save()
-        #Check if the place exist in our data base ! (needed later in the notifications system) 
-        p = Place.objects(name=request.form.get("city")).first()
-        if p == None:
-            p=Place(name=request.form.get("city"),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
-            p.save() 
-        w.save()
+        # Check if the user is logged in
+        if 'user_id' in session: 
+            user = User.objects(id=session['user_id']).first()
+            data= get_weather_data(api_key , request.form.get("city"))
+            #Add the searched weather to the user history 
+            w= Weather(data=data,city=request.form.get("city"))
+            h=History(user_id=user.id,data=data,city=request.form.get("city"))
+            h.save()
+            #Check if the place exist in our data base ! (needed later in the notifications system) 
+            p = Place.objects(name=request.form.get("city")).first()
+            if p == None:
+                p=Place(name=request.form.get("city"),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
+                p.save() 
+            w.save()
         return make_response(jsonify("le meteo de la ville ",request.form.get("city"),"est : ", data), 200)
     else :  
         Ls = []
@@ -230,18 +232,7 @@ def register():
             data=get_city_data(api_key,location)
             if not data: #verification si location saisi par user est valide ou non
                 return make_response("location invalide", 201)
-            else:
-                p=Place(name=location,lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
-                p.save()
-            for c in cities:
-                data=get_city_data(api_key,c)
-                if not data:
-                    return make_response("location invalide", 201)
-                else:
-                    p=Place(name=c,lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
-                    p.save()
-
-                
+            
             hashpass = generate_password_hash(pwd, method='sha256')
             v = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location, cities=cities)
             max_id = 0      #assign an id to the user
@@ -273,7 +264,6 @@ def login():
 
     # Set session data
     session['user_id'] = check_user['id']
-
     login_user(check_user)
     return make_response("logged In successfully!", 200)
 

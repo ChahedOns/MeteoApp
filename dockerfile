@@ -1,5 +1,6 @@
 # For more information, please refer to https://aka.ms/vscode-docker-python
-FROM python:3.10-slim-buster
+FROM python:3.12-rc-slim-buster
+
 
 EXPOSE 5000
 ENV key=value
@@ -22,5 +23,5 @@ RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /
 USER appuser
 
 # During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
-CMD  ["gunicorn", "--bind", "0.0.0.0:5000","src.app\app:app"]
+CMD  ["python","gunicorn", "--bind", "0.0.0.0:5000","src.app\app:app"]
 
