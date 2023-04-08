@@ -287,13 +287,13 @@ def profile():
     return f"<h1>Bonjour, {user.name}!</h1>"  
 
 @login_required
-@app.route('/notifications',methods=['GET'])
+@app.route('/notifications',methods=['GET','DELETE'])
 def get_notif():
-    Ls=[]
-    for n in Notification.objects:
-        if n.user_id==session['user_id']:
-            Ls.append(n.msg)
-    return make_response(jsonify("Les notifications sont : \n",Ls), 200)
+    if request.method =='DELETE':
+        Notification.objects.delete()
+    else:
+        ls= Notification.objects(user_id=session['user_id'])
+        return make_response(jsonify("Les notifications sont : \n",ls), 200)
 
 
 
@@ -341,27 +341,28 @@ def check_changes():
                 else:
                     msg=weatherStatus
                 #Check the last notification on that location!
-                last_notif = Notification.objects(date=datetime.date.today(),location=p.name).first()
-
+                last_notif = Notification.objects(date=datetime.date.today(),location=p.name)
                 if last_notif is not None:
-                    #There is changes!
-                    if msg != last_notif.msg:
-                        #Sending new notifiction with changes
-                        print("Detecting changes!")
-                        produce_weather_data('Check_notif',msg,p.name)
-                    else:
-                        pass
+                    for l in last_notif:
+                        #There is changes!
+                        if msg != l.msg:
+                            #Sending new notifiction with changes
+                            print("Detecting changes!")
+                            produce_weather_data('Check_notif',msg,p.name)
+                        else:
+                            pass
                 else:
                     #Produce new notification! 
                     produce_weather_data('Check_notif',msg,p.name)
             else:
                 print('Error retrieving weather data.')
-        time.sleep(15)
+        time.sleep()
 
 #The consumer function 
 def consume_notification():
     try:
         while True:
+            Notification.objects.delete()
             print("Consuming processing ...")
             for message in consumer:
                 # read single message at a time
