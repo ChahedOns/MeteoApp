@@ -69,7 +69,7 @@ const store = new Vuex.Store({
       try {
         commit("SET_SEARCH", search);
         const response = await axios.get(
-          `${state.apiBase}weather?q=${search}&units=metric&APPID=${state.apiKey}`
+            `${state.apiBase}weather?q=${search}&units=metric&APPID=${state.apiKey}`
         );
         const newWeatherData = {
           name: response.data.name,
@@ -133,3 +133,4 @@ const store = new Vuex.Store({
 });
 
 export default store;
+

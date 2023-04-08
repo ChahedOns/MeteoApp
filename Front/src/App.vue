@@ -31,6 +31,7 @@
         </div>
       </div>
     </transition>
+    <NotIfs/>
 
     <WeatherAnimate />
   </div>
@@ -47,6 +48,7 @@ import WeekChart from "@/components/WeekChart";
 
 import LogIn from "@/components/LogIn";
 import SignUp from "@/components/SignUp";
+import NotIfs from "@/components/NotIfs";
 import axios from "axios";
 
 
@@ -61,6 +63,7 @@ export default {
     WeatherAnimate,
     LogIn,
     SignUp,
+    NotIfs,
 
   },
   data() {

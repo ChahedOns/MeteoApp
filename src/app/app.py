@@ -52,14 +52,14 @@ def get_weather_data(api_key, city):
 
 def get_forcast_data(api_key,lat,lon):
     url = f"api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={api_key}"
-    
+
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
         return data
     else:
         return None
-    
+
 def get_city_data(api_key,city):
     url= f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=5&appid={api_key}"
     response = requests.get(url)
@@ -91,13 +91,20 @@ class User(db.Document, UserMixin):
         """Checks that the pw provided hashes to the stored pw hash value"""
         return check_password_hash(self.password_hash, password)
     def __repr__(self):
-            """Define what is printed for the user object"""
-            return f"Username: {self.username} id: {self.id}"
-    
+        """Define what is printed for the user object"""
+        return f"Username: {self.username} id: {self.id}"
+
 class Place(db.Document):
-    name=db.StringField(required=True)
+    name=db.StringField(required=True, primary_key=True)
     lat=db.FloatField()
     lon=db.FloatField()
+
+    def to_json(self):
+        return{
+            "Name": self.name,
+            "Lat":self.lat,
+            "Lon":self.lon
+        }
 
 class Weather(db.Document):
     data=db.DictField()
@@ -138,37 +145,40 @@ def get_places():
 @app.route("/weather", methods=['POST', 'GET'])
 def set_weather():
     if request.method == "POST":
-        data= get_weather_data(api_key , request.form.get("city"))
+        # Check if the user_info is present in the POST request data
+        if 'user_id' not in request.json:
+            return "<h1>Paramètre manquant</h1>"
 
-        if 'user_id' in session:        # Check if the user is logged in           
-            user = User.objects(id=session['user_id']).first()        # Load the user's data from the database
-        
-            #Add the searched weather to the user history 
-            w= Weather(data=data,city=request.form.get("city"))
-            h=History(user_id=user.id,data=data,city=request.form.get("city"))
-            h.save()
-            #Check if the place exist in our data base ! (needed later in the notifications system) 
-            p = Place.objects(name=request.form.get("city")).first()
-            if p == None:
-                p=Place(name=request.form.get("city"),lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
-                p.save() 
-            w.save()
-        return make_response(jsonify("le meteo de la ville ",request.form.get("city"),"est : ", data), 200)
-    else :  
+        # Load the user's data from the database
+        user = User.objects(id=request.json['user_id']).first()
+
+        data= get_weather_data(api_key , request.json.get("city"))
+        #Add the searched weather to the user history
+        w= Weather(data=data,city=request.json.get("city"))
+        h=History(user_id=user.id,data=data,city=request.json.get("city"))
+        h.save()
+        #Check if the place exist in our data base ! (needed later in the notifications system)
+        p = Place.objects(name=request.json.get("city")).first()
+        if p == None:
+            p=Place(name=request.json.get("city"),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
+            p.save()
+        w.save()
+        return make_response(jsonify("le meteo de la ville ",request.json.get("city"),"est : ", data), 200)
+    else :
         Ls = []
-        for r in Weather.objects(city=request.form.get("city")):
+        for r in Weather.objects(city=request.json.get("city")):
             Ls.append(r)
         if Ls == []:
             return make_response("Aucun meteo sauvgardées dans le systéme!", 201)
         else:
-                        now = datetime.datetime.now()
-                        today =now.strftime('%d')
-                        for data in Ls:
-                            date_str = data['date']
-                            d = date_str.strftime('%d')
-                            if int(today) - int(d) <= 15:
-                                print("temperature : ", data['data'],"  date : ", data['date'])
-                        return make_response(jsonify("success"), 200)
+            now = datetime.datetime.now()
+            today =now.strftime('%d')
+            for data in Ls:
+                date_str = data['date']
+                d = date_str.strftime('%d')
+                if int(today) - int(d) <= 15:
+                    print("temperature : ", data['data'],"  date : ", data['date'])
+            return make_response(jsonify("success"), 200)
 
 @login_required
 @app.route("/historique", methods=['GET','POST'])
@@ -183,7 +193,7 @@ def get_history():
         else:
             return make_response(jsonify("L'Historique de météo de",city,"est : \n",hs), 200)
     else:
-    #Get all the user's history 
+        #Get all the user's history
         u=User.objects(id=session['user_id']).first
         hs= History.objects(user_id=u.id)
         if hs == "None":
@@ -201,8 +211,8 @@ def get_forcast():
     if p == "None":
         data= get_weather_data(api_key , city)
         w= Weather(data=data,city=request.form.get("city"))
-        p=Place(name=request.form.get("city"),lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
-        p.save() 
+        p=Place(name=request.form.get("city"),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
+        p.save()
         w.save()
         forcast_data= get_forcast_data(api_key,float(data["coord"]["lat"]),float(data["coord"]["lon"]))
         return make_response(jsonify("forcast de la ville  ",city,"est : ", forcast_data), 200)
@@ -223,24 +233,15 @@ def register():
         location = request.form.get("location")
         cities = request.form.get("cities").split(':')  # split the : separated list into a Python list --> city1:city2:city3....
         existing_user = User.objects(mail=mail).first()
-        #Adding all the cities and location to place class 
+        print(cities)
+        #Adding all the cities and location to place class
         if existing_user is None:
-            p= Place.objects(name=location).first()
-            #si le cité en question n'existe pas dans la base on l'ajout de plus son meteo courant et on recupére son forcast!
-            if p == None:
-                data= get_city_data(api_key , location)
-                if not data: #verification si location saisi par user est valide ou non
-                    return make_response("location invalide", 201)
-                p=Place(name=location,lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
-                p.save() 
-            for c in cities:                                
-                p1= Place.objects(name=c).first()
-                if p1 == None:
-                    data1=get_city_data(api_key,c)
-                    if not data1: #verification si location saisi par user est valide ou non
-                        return make_response("city invalide", 201)
-                    p1=Place(name=c,lat=float(data1[0]["lat"]),lon=float(data1[0]["lon"]))
-                    p1.save()
+            data=get_city_data(api_key,location)
+            if not data: #verification si location saisi par user est valide ou non
+                return make_response("location invalide", 201)
+
+
+
             hashpass = generate_password_hash(pwd, method='sha256')
             v = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location, cities=cities)
             max_id = 0      #assign an id to the user
@@ -272,60 +273,60 @@ def login():
 
     # Set session data
     session['user_id'] = check_user['id']
+    us_id = session['user_id']
+    us_id_str = str(us_id)
+
     print(session['user_id'])
+    print(us_id)
+    print(us_id_str)
 
     login_user(check_user)
-    return make_response("logged In successfully!", 200)
+    return make_response(us_id_str, 200)
 
 @app.route('/logout', methods=['POST'])
 def logout():
     logout_user()
     # Remove session data
     session.pop('user_id', None)
-    return make_response("Logged out!", 200)   
+    return make_response("Logged out!", 200)
 
 @app.route('/profile', methods=['POST'])
 def profile():
-    # Check if the user is logged in
-    if 'user_id' not in session:
-        return "<h1>Vous n'êtes pas connecté</h1>"
+    # Check if the user_info is present in the POST request data
+    if 'user_id' not in request.json:
+        return "<h1>Paramètre manquant</h1>"
 
     # Load the user's data from the database
-    user = User.objects(id=session['user_id']).first()
+    user = User.objects(id=request.json['user_id']).first()
 
     # Display the user's profile page
-    return f"<h1>Bonjour, {user.name}!</h1>"  
+    return f"<h1>Bonjour, {user.name}!</h1>"
 
 @login_required
 @app.route('/notifications',methods=['GET'])
 def get_notif():
-    # Check if the user is logged in
-    if 'user_id' not in session:
-        return "<h1>Vous n'êtes pas connecté</h1>"
-    Ls=[]
-    for n in Notification.objects:
-        if n.user_id==session['user_id']:
-            print("msg = ",n.msg)
-            Ls.append(n.msg)
-    return make_response(jsonify("Les notifications sont : \n",Ls), 200)
+
+    us_id = request.args.get('user_id')
+    ls = Notification.objects(user_id=us_id)
+    return make_response(jsonify("Les notifications sont : \n",ls), 200)
 
 
 
 # ******************** KAFKA ************************
-#Kafka-confluent Configs 
+#Kafka-confluent Configs
 producer = KafkaProducer(value_serializer=lambda m: json.dumps(m).encode('utf-8'),bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
-                        sasl_mechanism='PLAIN',
-                        security_protocol='SASL_SSL',
-                        sasl_plain_username='W2W37CHYQAEEQ55R',
-                        sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',
-                        api_version=(2, 7, 0))
+                         sasl_mechanism='PLAIN',
+                         security_protocol='SASL_SSL',
+                         sasl_plain_username='W2W37CHYQAEEQ55R',
+                         sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',
+                         api_version=(2, 7, 0))
 consumer = KafkaConsumer ('Check_notif', group_id = 'group1',bootstrap_servers = ['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
-                        sasl_mechanism='PLAIN',security_protocol='SASL_SSL',sasl_plain_username='W2W37CHYQAEEQ55R',
-                        sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',auto_offset_reset = 'earliest',value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+                          sasl_mechanism='PLAIN',security_protocol='SASL_SSL',sasl_plain_username='W2W37CHYQAEEQ55R',
+                          sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',auto_offset_reset = 'earliest',value_deserializer=lambda m: json.loads(m.decode('utf-8')))
 
 consumer.subscribe(['Check_notif'])
 
-#The producer function 
+#The producer function
 def produce_weather_data(topic, msg ,location):
     # Convert data to dictionary
     data={"msg":msg, "location":location}
@@ -334,7 +335,7 @@ def produce_weather_data(topic, msg ,location):
     producer.flush()
     print(f'Production processing on "{topic}": {msg} , {location}')
 
-#The con job function 
+#The con job function
 def check_changes():
     while True:
         #Check all the cities
@@ -342,7 +343,7 @@ def check_changes():
         for p in ps:
             weather_data = get_weather_data(api_key, p.name)
             if weather_data is not None:
-                #Prepare the msg! 
+                #Prepare the msg!
                 weatherStatus= weather_data["weather"][0]["main"]
                 if weatherStatus == "Snow":
                     msg = "Snowy Day Alert !Stay at home, drink something warm! Snowy Day!"
@@ -358,42 +359,44 @@ def check_changes():
                 last_notif = Notification.objects(date=datetime.date.today(),location=p.name).first()
 
                 if last_notif is not None:
-                    #There is changes!
-                    if msg != last_notif.msg:
-                        #Sending new notifiction with changes
-                        print("Detecting changes!")
-                        produce_weather_data('Check_notif',msg,p.name)
-                    else:
-                        pass
+                    for l in last_notif:
+                        #There is changes!
+                        if msg != l.msg:
+                            #Sending new notifiction with changes
+                            print("Detecting changes!")
+                            produce_weather_data('Check_notif',msg,p.name)
+                        else:
+                            pass
                 else:
-                    #Produce new notification! 
+                    #Produce new notification!
                     produce_weather_data('Check_notif',msg,p.name)
             else:
                 print('Error retrieving weather data.')
-        time.sleep(15)
+        time.sleep()
 
-#The consumer function 
+#The consumer function
 def consume_notification():
     try:
         while True:
+            Notification.objects.delete()
             print("Consuming processing ...")
             for message in consumer:
                 # read single message at a time
                 if message is None:
                     print("msg vide")
                 else:
-                #Search all users that are interessted in that location
+                    #Search all users that are interessted in that location
                     users= User.objects()
                     for u in users:
-                        #Create for each user a new notification 
-                        #Specific notification for the user's location 
+                        #Create for each user a new notification
+                        #Specific notification for the user's location
                         if u.location == message.value["location"]:
                             n=Notification(user_id=u.id,msg=message.value["msg"],location=message.value["location"])
                             n.save()
-                         #Specific notification for the user's favorite cities 
+                        #Specific notification for the user's favorite cities
                         else:
                             for city in u.cities:
-                                if city == message.value["location"]: 
+                                if city == message.value["location"]:
                                     n=Notification(user_id=u.id,msg=message.value["msg"],location=city)
                                     n.save()
             consumer.commit()
