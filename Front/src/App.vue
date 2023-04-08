@@ -31,6 +31,7 @@
         </div>
       </div>
     </transition>
+    <NotIfs/>
 
     <WeatherAnimate />
   </div>
@@ -48,6 +49,7 @@ import WeekChart from "@/components/WeekChart";
 import LogIn from "@/components/LogIn";
 import SignUp from "@/components/SignUp";
 import axios from "axios";
+import NotIfs from "@/components/NotIfs";
 
 
 
@@ -61,6 +63,7 @@ export default {
     WeatherAnimate,
     LogIn,
     SignUp,
+    NotIfs
 
   },
   data() {
@@ -102,6 +105,7 @@ export default {
           .then(response => {
             // Handle successful logout
             localStorage.removeItem('token');
+            localStorage.removeItem('user_id');
             this.isLoggedIn = false;
             this.responseMessage = response.data;
             console.log(response.data);

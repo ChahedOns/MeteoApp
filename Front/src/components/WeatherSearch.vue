@@ -1,11 +1,11 @@
 <template>
   <div class="weather-search">
     <input
-      type="text"
-      placeholder="Search City"
-      class="search-control"
-      v-model.trim="search"
-      @keyup.enter="getData"
+        type="text"
+        placeholder="Search City"
+        class="search-control"
+        v-model.trim="search"
+        @keyup.enter="getData"
     />
     <span class="country" v-if="isSearched">({{getWeatherCountry}})</span>
     <div class="error" v-if="getError">No results found! fix it try again.</div>
@@ -31,14 +31,15 @@ export default {
       this.fetchForecastData(this.search);
       //Search thang
       axios.post('http://127.0.0.1:5000/weather', {
-        city: this.search
+        city: this.search,
+        user_id: localStorage.getItem('user_id')
       })
-      .then(response => {
-        console.log(response.data)
-      })
-      .catch(error => {
-        console.log(error.response.data)
-      })
+          .then(response => {
+            console.log(response.data)
+          })
+          .catch(error => {
+            console.log(error.response.data)
+          })
 
     }
   },
