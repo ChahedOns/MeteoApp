@@ -15,10 +15,12 @@ http://127.0.0.1/
 #Get current weather of a specific city : http://127.0.0.1:5000/weather (method=POST) ( entry data -> form 1 input : city ( string) ) 
 #Get all weather saved data of a specific city : http://127.0.0.1:5000/weather (method=GET) ( entry data -> form 1 input : city ( string) ) 
 #To use those APIs you should be logged in :
-  #Get history weather of a specific city : http://127.0.0.1:5000/history ( method=GET) entry data -> form 1 input  : city(string)
+  #Get history weather of a specific city : http://127.0.0.1:5000/history ( method=GET) ( ALL THE SEARCH HISTORY)
+  #Get history weather of a specific city : http://127.0.0.1:5000/history ( method=POST) entry data -> form 1 input  : city(string)
   #Get forcast weather of a specific city : http://127.0.0.1:5000/forcast ( method=POST) entry data -> form 1input : city (string 
 
 *********************** Notification ********************************
-
+#To use this API you should be logged in :
+  #Receive alerts regarding weather conditions for cities that are of interest to the user: http://127.0.0.1:5000/notifications ( method=GET)
 
 

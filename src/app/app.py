@@ -10,12 +10,14 @@ import requests
 from werkzeug.security import check_password_hash
 import datetime
 from kafka import KafkaProducer ,KafkaConsumer
+from flask_cors import CORS
 import requests
 import threading
 
 
 # configurations !
 app = Flask(__name__)
+CORS(app)
 DB_URI ="mongodb+srv://admin:adminadmin@cluster0.ad4hkct.mongodb.net/MeteoApp?retryWrites=true&w=majority"
 app.config["MONGODB_HOST"] = DB_URI
 app.config['SECRET_KEY'] = secret_key
@@ -76,7 +78,7 @@ class User(db.Document, UserMixin):
     name = db.StringField()
     birth_date = db.DateTimeField()
     location=db.StringField(required=True)
-    cities = db.ListField(db.StringField())
+    cities = db.ListField()
     def to_json(self):
         return {
             "ID": self.id,
@@ -96,13 +98,6 @@ class Place(db.Document):
     name=db.StringField(required=True)
     lat=db.FloatField()
     lon=db.FloatField()
-
-    def to_json(self):
-        return{
-            "Name": self.name,
-            "Lat":self.lat,
-            "Lon":self.lon
-        }
 
 class Weather(db.Document):
     data=db.DictField()
@@ -139,14 +134,13 @@ def get_places():
             return make_response("Aucun cite dans le systéme!", 201)
         else:
             return make_response(jsonify("tous les cites sont : ", Ls), 200)
-    
+
 @app.route("/weather", methods=['POST', 'GET'])
 def set_weather():
     if request.method == "POST":
-        # Check if the user is logged in
-        if 'user_id' in session: 
-            user = User.objects(id=session['user_id']).first()
-            data= get_weather_data(api_key , request.form.get("city"))
+        if 'user_id' in session:        # Check if the user is logged in           
+            user = User.objects(id=session['user_id']).first()        # Load the user's data from the database
+        
             #Add the searched weather to the user history 
             w= Weather(data=data,city=request.form.get("city"))
             h=History(user_id=user.id,data=data,city=request.form.get("city"))
@@ -154,7 +148,7 @@ def set_weather():
             #Check if the place exist in our data base ! (needed later in the notifications system) 
             p = Place.objects(name=request.form.get("city")).first()
             if p == None:
-                p=Place(name=request.form.get("city"),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
+                p=Place(name=request.form.get("city"),lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
                 p.save() 
             w.save()
         return make_response(jsonify("le meteo de la ville ",request.form.get("city"),"est : ", data), 200)
@@ -205,7 +199,7 @@ def get_forcast():
     if p == "None":
         data= get_weather_data(api_key , city)
         w= Weather(data=data,city=request.form.get("city"))
-        p=Place(name=request.form.get("city"),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
+        p=Place(name=request.form.get("city"),lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
         p.save() 
         w.save()
         forcast_data= get_forcast_data(api_key,float(data["coord"]["lat"]),float(data["coord"]["lon"]))
@@ -229,10 +223,24 @@ def register():
         existing_user = User.objects(mail=mail).first()
         #Adding all the cities and location to place class 
         if existing_user is None:
-            data=get_city_data(api_key,location)
-            if not data: #verification si location saisi par user est valide ou non
-                return make_response("location invalide", 201)
-            
+            p= Place.objects(name=location).first()
+            #si le cité en question n'existe pas dans la base on l'ajout de plus son meteo courant et on recupére son forcast!
+            if p == None:
+                data= get_city_data(api_key , location)
+                if not data: #verification si location saisi par user est valide ou non
+                    return make_response("location invalide", 201)
+                p=Place(name=location,lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
+                p.save() 
+            for c in cities:                                
+                p1= Place.objects(name=c).first()
+                if p1 == None:
+                    data1=get_city_data(api_key,c)
+                    if not data1: #verification si location saisi par user est valide ou non
+                        return make_response("city invalide", 201)
+                    p1=Place(name=c,lat=float(data1[0]["lat"]),lon=float(data1[0]["lon"]))
+                    p1.save()
+
+                
             hashpass = generate_password_hash(pwd, method='sha256')
             v = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location, cities=cities)
             max_id = 0      #assign an id to the user
@@ -375,7 +383,7 @@ def consume_notification():
                         #Create for each user a new notification 
                         #Specific notification for the user's location 
                         if u.location == message.value["location"]:
-                            n=Notification(user_id=u.id,msg=message.value["location"],location=message.value["location"])
+                            n=Notification(user_id=u.id,msg=message.value["msg"],location=message.value["location"])
                             n.save()
                          #Specific notification for the user's favorite cities 
                         else:
