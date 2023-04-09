@@ -101,7 +101,7 @@ class Place(db.Document):
 
 class Weather(db.Document):
     data=db.DictField()
-    date=db.DateField(default=datetime.datetime.now())
+    date=db.DateTimeField(default=datetime.datetime.utcnow)
     city=db.StringField()
     def to_json(self):
         return{
@@ -140,7 +140,6 @@ def set_weather():
     if request.method == "POST":
         if 'user_id' in session:        # Check if the user is logged in           
             user = User.objects(id=session['user_id']).first()        # Load the user's data from the database
-        
             #Add the searched weather to the user history 
             w= Weather(data=data,city=request.form.get("city"))
             h=History(user_id=user.id,data=data,city=request.form.get("city"))
@@ -240,7 +239,6 @@ def register():
                     p1=Place(name=c,lat=float(data1[0]["lat"]),lon=float(data1[0]["lon"]))
                     p1.save()
 
-                
             hashpass = generate_password_hash(pwd, method='sha256')
             v = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location, cities=cities)
             max_id = 0      #assign an id to the user
@@ -364,7 +362,7 @@ def check_changes():
                     produce_weather_data('Check_notif',msg,p.name)
             else:
                 print('Error retrieving weather data.')
-        time.sleep()
+        time.sleep(15)
 
 #The consumer function 
 def consume_notification():
@@ -392,7 +390,7 @@ def consume_notification():
                                     n=Notification(user_id=u.id,msg=message.value["msg"],location=city)
                                     n.save()
             consumer.commit()
-            time.sleep(1)
+            time.sleep(15)
     except Exception as ex:
         print(f"Kafka Exception : { ex}")
 
