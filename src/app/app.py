@@ -385,7 +385,7 @@ def check_changes():
                     produce_weather_data('Check_notif',msg,p.name)
             else:
                 print('Error retrieving weather data.')
-        time.sleep()
+        time.sleep(15)
 
 #The consumer function 
 def consume_notification():
