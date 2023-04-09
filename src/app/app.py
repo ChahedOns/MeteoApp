@@ -68,6 +68,15 @@ def get_city_data(api_key,city):
         return data
     else:
         return None
+    
+def get_city_history(lat,lon,date_dep,date_fin):
+    url= f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}&start_date={date_dep}&timezone=GMT&end_date={date_fin}&daily=temperature_2m_max"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        return data
+    else:
+        return None
 
 #Documents definitions
 
@@ -122,6 +131,10 @@ class History(db.Document):
     city=db.StringField()
     date=db.DateField(default=datetime.datetime.today())
 # App Routers
+
+class HistoryCity(db.Document):
+    city_name=db.StringField()
+    data=db.DictField()
 
 
 @app.route("/cities", methods=['POST', 'GET'])
@@ -324,7 +337,36 @@ def get_notif():
     return jsonify(notifications), 200
 
 
+@app.route('/city/historique',methods=['GET'])
+def get_city_hist():
+    ps=[]
+    result=[]
+    user_id=request.args.get('user_id')
+    user=User.objects(id=user_id).first()
+    #Add all the user's favorites and his own location
+    p=Place.objects(name=user.location)
+    ps.append(p)
+    for c in user.cities:
+        ps.append(c)
+    #Set the new history of each city
+    for p in ps:
+        data1=get_city_data(api_key,p)
+        date_deb= datetime.date.fromordinal(datetime.date.today().toordinal()-15)
+        history=get_city_history(data1[0]["lat"],data1[0]["lon"],date_deb,datetime.date.today())
+        hc=HistoryCity.objects(city_name=p).first()
+        if hc == None:
+            hc=HistoryCity(city_name=p,data=history["daily"])
+        else:
+            hc.update(data=history)
+        #Prepare the user's result data!
+        result.append({'city':p,'history':history["daily"]})
+    return jsonify(result) , 200
 
+    
+
+
+
+    
 # ******************** KAFKA ************************
 #Kafka-confluent Configs 
 producer = KafkaProducer(value_serializer=lambda m: json.dumps(m).encode('utf-8'),bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
