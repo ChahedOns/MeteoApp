@@ -3,13 +3,23 @@
     <div class="notification-bell" @click="getNotifications">
       <span class="notification-count">{{ notificationCount }}</span>
     </div>
-    <ul class="notification-list">
-      <li v-for="notification in notifications" :key="notification.id">
-        {{ notification.message }}
-      </li>
-    </ul>
+    <transition name="fade">
+      <ul class="notification-list" v-if="notifications.length">
+        <div class="notification-title">Here are your notifications for today!</div>
+        <li v-for="notification in notifications" :key="notification.id">
+          <div class="notification-item">
+            <h2 class="location">{{ notification.location }}:</h2>
+            <span class="message">{{notification.message}}</span>
+          </div>
+        </li>
+      </ul>
+    </transition>
   </div>
 </template>
+
+
+
+
 <script>
 import axios from "axios";
 
@@ -17,7 +27,7 @@ export default {
   name: "NotIfs",
   data() {
     return {
-      notifications: [],
+      notifications: {},
       notificationCount: 0
     };
   },
@@ -39,7 +49,18 @@ export default {
   }
 };
 </script>
+
+
 <style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.7s ease;
+}
+
+.fade-enter,
+.fade-leave-to {
+  opacity: 0;
+}
 .notifications {
   position: fixed;
   top: 20px;
@@ -58,6 +79,10 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
+  transition: all 0.3s ease;
+}
+.notification-bell:hover {
+  transform: scale(1.2);
 }
 
 .notification-count {
@@ -85,13 +110,45 @@ export default {
   width: 300px;
   list-style: none;
   display: none;
+  border-radius: 5px;
 }
 
-.notification-list li {
+.notification-item {
+  border: 1px solid #ccc;
+  padding: 10px;
   margin-bottom: 10px;
+  border-radius: 5px;
+}
+
+.notification-item .location {
+  color: #00ffff; /* dark gray */
+  font-size: 20px;
+  text-align: justify;
+  margin: 0;
+}
+
+.notification-item .message {
+  color: #6A1B9A; /* gray */
+  font-size: 18px;
+  margin: 0;
 }
 
 .notifications:hover .notification-list {
   display: block;
+}
+
+.notification-bell:before {
+  content: "\f0f3"; /* bell icon */
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  font-size: 20px;
+  color: #3b3b3b; /* dark gray */
+}
+
+.notification-title {
+  text-align: center;
+  margin-bottom: 10px;
+  font-size: 24px;
+  color: #ff9900; /* dark gray */
 }
 </style>

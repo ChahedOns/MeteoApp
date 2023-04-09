@@ -1,7 +1,7 @@
 import Vue from "vue";
 import App from "./App.vue";
 import store from "./store/store";
-
+import '@fortawesome/fontawesome-free/css/all.css'
 
 Vue.config.productionTip = false;
 Vue.filter("round", function(value, decimals) {

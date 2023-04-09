@@ -144,23 +144,22 @@ def set_weather():
 
         # Load the user's data from the database
         user = User.objects(id=request.json['user_id']).first()
-        city=request.json.get("city").lower()
-        data= get_weather_data(api_key , city)
+
+        data= get_weather_data(api_key , request.json.get("city"))
         #Add the searched weather to the user history
-        w= Weather(data=data,city=city)
-        h=History(user_id=user.id,data=data,city=city)
+        w= Weather(data=data,city=request.json.get("city"))
+        h=History(user_id=user.id,data=data,city=request.json.get("city"))
         h.save()
         #Check if the place exist in our data base ! (needed later in the notifications system)
-        p = Place.objects(name=city).first()
+        p = Place.objects(name=request.json.get("city")).first()
         if p == None:
-            data1= get_city_data(api_key , city)
-            p=Place(name=city,lat=float(data1[0]["lat"]),lon=float(data1[0]["lon"]))
+            p=Place(name=request.json.get("city"),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
             p.save()
         w.save()
-        return make_response(jsonify("le meteo de la ville ",city,"est : ", data), 200)
+        return make_response(jsonify("le meteo de la ville ",request.json.get("city"),"est : ", data), 200)
     else :
         Ls = []
-        for r in Weather.objects(city=city):
+        for r in Weather.objects(city=request.json.get("city")):
             Ls.append(r)
         if Ls == []:
             return make_response("Aucun meteo sauvgardées dans le systéme!", 201)
@@ -179,21 +178,26 @@ def set_weather():
 def get_history():
     #Get the History of a specific city
     if request.method == "POST":
-        c=request.form.get("city")
+        c=request.json.get("city")
         city=c.lower()
-        hs = History.objects(user_id=session['user_id'], city=city)
+        u=User.objects(id=request.json['user_id']).first()
+        print(u.id)
+        print(city)
+        hs = History.objects(user_id=u.id, city=city)
+        print(hs)
         if hs == "None":
             return make_response("Aucun Meteo sauvgardée pour cette ville", 201)
         else:
-            return make_response(jsonify("L'Historique de meteo de",city,"est : \n",hs), 200)
+            return make_response(jsonify(hs), 200)
     else:
-    #Get all the user's history 
-        hs= History.objects(user_id=session['user_id'])
+        #Get all the user's history
+        u=User.objects(id=request.json['user_id']).first()
+
+        hs= History.objects(user_id=u.id)
         if hs == "None":
             return make_response("Aucun Historique pour vous", 201)
         else:
-            return make_response(jsonify("L'Historique de meteo est : \n", hs), 200)
-
+            return make_response(jsonify(hs), 200)
 
 @login_required
 @app.route("/forcast",methods=["get"])
@@ -312,9 +316,12 @@ def profile():
 @login_required
 @app.route('/notifications',methods=['GET'])
 def get_notif():
+
     us_id = request.args.get('user_id')
-    ls = Notification.objects(user_id=us_id)
-    return make_response(jsonify("Les notifications sont : \n",ls), 200)
+    notifications = []
+    for n in Notification.objects(user_id=us_id):
+        notifications.append({'message': n.msg, 'location': n.location})
+    return jsonify(notifications), 200
 
 
 
