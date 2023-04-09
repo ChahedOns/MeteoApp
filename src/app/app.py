@@ -144,22 +144,23 @@ def set_weather():
 
         # Load the user's data from the database
         user = User.objects(id=request.json['user_id']).first()
-
-        data= get_weather_data(api_key , request.json.get("city"))
+        city=request.json.get("city").lower()
+        data= get_weather_data(api_key , city)
         #Add the searched weather to the user history
-        w= Weather(data=data,city=request.json.get("city"))
-        h=History(user_id=user.id,data=data,city=request.json.get("city"))
+        w= Weather(data=data,city=city)
+        h=History(user_id=user.id,data=data,city=city)
         h.save()
         #Check if the place exist in our data base ! (needed later in the notifications system)
-        p = Place.objects(name=request.json.get("city")).first()
+        p = Place.objects(name=city).first()
         if p == None:
-            p=Place(name=request.json.get("city"),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
+            data1= get_city_data(api_key , city)
+            p=Place(name=city,lat=float(data1[0]["lat"]),lon=float(data1[0]["lon"]))
             p.save()
         w.save()
-        return make_response(jsonify("le meteo de la ville ",request.json.get("city"),"est : ", data), 200)
+        return make_response(jsonify("le meteo de la ville ",city,"est : ", data), 200)
     else :
         Ls = []
-        for r in Weather.objects(city=request.json.get("city")):
+        for r in Weather.objects(city=city):
             Ls.append(r)
         if Ls == []:
             return make_response("Aucun meteo sauvgardées dans le systéme!", 201)
@@ -178,36 +179,36 @@ def set_weather():
 def get_history():
     #Get the History of a specific city
     if request.method == "POST":
-        city=request.form.get("city")
-        u=User.objects(id=session['user_id']).first
-        hs = History.objects(user_id=u.id, city=city)
+        c=request.form.get("city")
+        city=c.lower()
+        hs = History.objects(user_id=session['user_id'], city=city)
         if hs == "None":
             return make_response("Aucun Meteo sauvgardée pour cette ville", 201)
         else:
-            return make_response(jsonify("L'Historique de météo de",city,"est : \n",hs), 200)
+            return make_response(jsonify("L'Historique de meteo de",city,"est : \n",hs), 200)
     else:
     #Get all the user's history 
-        u=User.objects(id=session['user_id']).first
-        hs= History.objects(user_id=u.id)
+        hs= History.objects(user_id=session['user_id'])
         if hs == "None":
             return make_response("Aucun Historique pour vous", 201)
         else:
-            return make_response(jsonify("L'Historique de météo est : \n", hs), 200)
+            return make_response(jsonify("L'Historique de meteo est : \n", hs), 200)
 
 
 @login_required
 @app.route("/forcast",methods=["get"])
 def get_forcast():
-    city=request.form.get("city")
+    city=request.form.get("city").lower()
     p= Place.objects(name=city).first()
     #si le cité en question n'existe pas dans la base on l'ajout de plus son meteo courant et on recupére son forcast!
     if p == "None":
         data= get_weather_data(api_key , city)
-        w= Weather(data=data,city=request.form.get("city"))
-        p=Place(name=request.form.get("city"),lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
+        w= Weather(data=data,city=city)
+        data1 = get_city_data(api_key, city)
+        p=Place(name=city,lat=float(data1[0]["lat"]),lon=float(data1[0]["lon"]))
         p.save() 
         w.save()
-        forcast_data= get_forcast_data(api_key,float(data["coord"]["lat"]),float(data["coord"]["lon"]))
+        forcast_data= get_forcast_data(api_key,float(data1[0]["lat"]),float(data1[0]["lon"]))
         return make_response(jsonify("forcast de la ville  ",city,"est : ", forcast_data), 200)
     else:
         #Si ca existe ! on affiche son forcast directement
@@ -223,7 +224,7 @@ def register():
         name = request.form.get("name")
         pwd = request.form.get("pwd")
         birth_date = request.form.get("birth_date")
-        location = request.form.get("location")
+        location = request.form.get("location").lower()
         cities = request.form.get("cities").split(':')  # split the : separated list into a Python list --> city1:city2:city3....
         existing_user = User.objects(mail=mail).first()
         #Adding all the cities and location to place class 
@@ -236,6 +237,8 @@ def register():
                     return make_response("location invalide", 201)
                 p=Place(name=location,lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
                 p.save() 
+            for i in range(len(cities)):
+                cities[i] = cities[i].lower()
             for c in cities:                                
                 p1= Place.objects(name=c).first()
                 if p1 == None:
@@ -309,7 +312,6 @@ def profile():
 @login_required
 @app.route('/notifications',methods=['GET'])
 def get_notif():
-
     us_id = request.args.get('user_id')
     ls = Notification.objects(user_id=us_id)
     return make_response(jsonify("Les notifications sont : \n",ls), 200)
