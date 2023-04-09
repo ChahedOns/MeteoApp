@@ -57,6 +57,7 @@ export default {
             if (response.status === 200) {
               this.isLoggedIn = true;
               this.$refs.loginForm.reset();
+              localStorage.setItem('user_id', response.data); // save user ID to local storage
               this.responseMessage = response.data;
               this.showSuccessMessage = true;
               this.$emit('login-status-changed', true);
@@ -78,18 +79,18 @@ export default {
           });
     },
     getData(){
-      axios.post('http://127.0.0.1:5000/profile')
-      .then(response => {
-        if (response.status ===200){
-          this.responseMessage = response.data;
-          console.log(this.responseMessage)
-        }
-      })
-      .catch( error => {
-        console.error(error);
-        this.responseMessage = error.response.data;
+      axios.post('http://127.0.0.1:5000/profile', {user_id: localStorage.getItem('user_id')})
+          .then(response => {
+            if (response.status ===200){
+              this.responseMessage = response.data;
+              console.log(this.responseMessage)
+            }
+          })
+          .catch( error => {
+            console.error(error);
+            this.responseMessage = error.response.data;
 
-      })
+          })
     },
     closeModal() {
       this.showLoginModal = false;
