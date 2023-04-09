@@ -61,7 +61,7 @@ def get_forcast_data(api_key,lat,lon):
         return None
     
 def get_city_data(api_key,city):
-    url= f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=5&appid={api_key}"
+    url= f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=1&appid={api_key}"
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
@@ -110,7 +110,7 @@ class Place(db.Document):
 
 class Weather(db.Document):
     data=db.DictField()
-    date=db.DateField(default=datetime.datetime.now())
+    date=db.DateTimeField(default=datetime.datetime.utcnow())
     city=db.StringField()
     def to_json(self):
         return{
@@ -123,13 +123,13 @@ class Notification(db.Document):
     user_id=db.IntField()
     msg=db.StringField()
     location=db.StringField()
-    date=db.DateField(default=datetime.datetime.today())
+    date=db.DateTimeField(default=datetime.datetime.utcnow())
 
 class History(db.Document):
     user_id=db.IntField()
     data=db.DictField()
     city=db.StringField()
-    date=db.DateField(default=datetime.datetime.today())
+    date=db.DateTimeField(default=datetime.datetime.utcnow())
 # App Routers
 
 class HistoryCity(db.Document):
@@ -160,13 +160,13 @@ def set_weather():
 
         data= get_weather_data(api_key , request.json.get("city"))
         #Add the searched weather to the user history
-        w= Weather(data=data,city=request.json.get("city"))
+        w= Weather(data=data,city=request.json.get("city").lower())
         h=History(user_id=user.id,data=data,city=request.json.get("city"))
         h.save()
         #Check if the place exist in our data base ! (needed later in the notifications system)
         p = Place.objects(name=request.json.get("city")).first()
         if p == None:
-            p=Place(name=request.json.get("city"),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
+            p=Place(name=request.json.get("city").lower(),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
             p.save()
         w.save()
         return make_response(jsonify("le meteo de la ville ",request.json.get("city"),"est : ", data), 200)
@@ -341,13 +341,16 @@ def get_notif():
 def get_city_hist():
     ps=[]
     result=[]
-    user_id=request.args.get('user_id')
+    user_id=request.form.get('user_id')
     user=User.objects(id=user_id).first()
+    print(user)
     #Add all the user's favorites and his own location
     p=Place.objects(name=user.location)
     ps.append(p)
-    for c in user.cities:
-        ps.append(c)
+
+    for i in range(len(user.cities)):
+        ps.append(user.cities[i])
+
     #Set the new history of each city
     for p in ps:
         data1=get_city_data(api_key,p)
@@ -362,11 +365,7 @@ def get_city_hist():
         result.append({'city':p,'history':history["daily"]})
     return jsonify(result) , 200
 
-    
 
-
-
-    
 # ******************** KAFKA ************************
 #Kafka-confluent Configs 
 producer = KafkaProducer(value_serializer=lambda m: json.dumps(m).encode('utf-8'),bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
@@ -382,7 +381,7 @@ consumer = KafkaConsumer ('Check_notif', group_id = 'group1',bootstrap_servers =
 consumer.subscribe(['Check_notif'])
 
 #The producer function 
-def produce_weather_data(topic, msg ,location):
+"""def produce_weather_data(topic, msg ,location):
     # Convert data to dictionary
     data={"msg":msg, "location":location}
     # Send data to Kafka topic
@@ -410,19 +409,6 @@ def check_changes():
                     msg="Grey Day Alert It may be a sad weather today! Be productive"
                 else:
                     msg=weatherStatus
-                #Check the last notification on that location!
-                last_notif = Notification.objects(date=datetime.date.today(),location=p.name).first()
-
-                if last_notif is not None:
-                    for l in last_notif:
-                        #There is changes!
-                        if msg != l.msg:
-                            #Sending new notifiction with changes
-                            print("Detecting changes!")
-                            produce_weather_data('Check_notif',msg,p.name)
-                        else:
-                            pass
-                else:
                     #Produce new notification!
                     produce_weather_data('Check_notif',msg,p.name)
             else:
@@ -462,15 +448,15 @@ def consume_notification():
     finally:
         print("closing consumer")
         consumer.close()
-
+"""
 
 if __name__ == '__main__':
 
-    # start the producer and consumer  in a separate threads
+    """# start the producer and consumer  in a separate threads
     producer_thread = threading.Thread(target=check_changes)
     producer_thread.start()
     consumer_thread = threading.Thread(target=consume_notification)
-    consumer_thread.start()
+    consumer_thread.start()"""
 
     # start the Flask application
     app.run()
