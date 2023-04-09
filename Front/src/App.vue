@@ -10,6 +10,7 @@
           <button v-if="!isLoggedIn " @click="toggleLoginModal" class="login">Log In</button>
           <button v-if="!isLoggedIn " @click="toggleSignupModal" class="signup">Sign Up</button>
           <button v-if="isLoggedIn " @click="logout">Log Out</button>
+          <button v-if="isLoggedIn" @click="toggleHistoryModal">Historique</button>
         </div>
 
       </div>
@@ -31,7 +32,15 @@
         </div>
       </div>
     </transition>
-    <NotIfs/>
+    <transition name="fade" mode="out-in">
+      <div v-if="showHistory" class="modal-wrapper">
+        <div class="modal-backdrop" @click="toggleHistoryModal"></div>
+        <div class="modal-content">
+          <HistoryData />
+        </div>
+      </div>
+    </transition>
+    <NotIfs v-if="isLoggedIn"/>
 
     <WeatherAnimate />
   </div>
@@ -50,6 +59,7 @@ import LogIn from "@/components/LogIn";
 import SignUp from "@/components/SignUp";
 import axios from "axios";
 import NotIfs from "@/components/NotIfs";
+import HistoryData from "@/components/HistoryData";
 
 
 
@@ -63,7 +73,9 @@ export default {
     WeatherAnimate,
     LogIn,
     SignUp,
-    NotIfs
+    NotIfs,
+    HistoryData
+
 
   },
   data() {
@@ -71,7 +83,8 @@ export default {
       showSignup: false,
       showLogin: false,
       showButton: true,
-      isLoggedIn: false
+      isLoggedIn: false,
+      showHistory: false
     };
   },
   computed: {
@@ -92,6 +105,10 @@ export default {
       this.showSignup = !this.showSignup;
       this.showButton = false;
     },
+    toggleHistoryModal() {
+      this.showHistory = !this.showHistory;
+      this.showButton = false;
+    },
     handleCloseLogInModal() {
       this.showLogin = false;
       this.showButton = true;
@@ -105,7 +122,6 @@ export default {
           .then(response => {
             // Handle successful logout
             localStorage.removeItem('token');
-            localStorage.removeItem('user_id');
             this.isLoggedIn = false;
             this.responseMessage = response.data;
             console.log(response.data);
@@ -116,6 +132,7 @@ export default {
             this.responseMessage = error.response.data
           });
     },
+
 
 
   },
