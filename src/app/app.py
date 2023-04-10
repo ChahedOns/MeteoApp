@@ -70,7 +70,6 @@ def get_city_data(api_key,city):
         return None
     
 def get_city_history(lat, lon, start_date, end_date):
-    #url= f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}&start_date={date_dep}&timezone=GMT&end_date={date_fin}&daily=temperature_2m_max"
     url = f"https://api.weatherbit.io/v2.0/history/daily?key=6f2c43a59b5a4476a4553686535896dd&lat={lat}&lon={lon}&start_date={start_date}&end_date={end_date}&units=M"
     response = requests.get(url)
     if response.status_code == 200:
@@ -407,17 +406,13 @@ def check_weather_alerts(weather_data):
     msg = ""
     
     if weather_data["weather"][0]["main"] == "Thunderstorm":
-        msg = "⚡⛈️ Alert: Thunderstorm detected! Please stay indoors and avoid exposed areas."
-    
+        msg = "⚡⛈️ Alert: Thunderstorm detected! Please stay indoors and avoid exposed areas."    
     elif weather_data["weather"][0]["main"] == "Tornado":
-        msg = "🌪️ Alert: Tornado detected! Seek shelter immediately in a basement or interior room on the lowest floor."
-    
+        msg = "🌪️ Alert: Tornado detected! Seek shelter immediately in a basement or interior room on the lowest floor."   
     elif weather_data["weather"][0]["main"] == "Squall":
-        msg = "💨 Alert: Squall detected! Avoid going outside and secure all loose objects."
-    
+        msg = "💨 Alert: Squall detected! Avoid going outside and secure all loose objects."   
     elif weather_data["weather"][0]["main"] in ["Haze", "Smoke", "Dust", "Ash"]:
-        msg = "🌫️ Alert: Poor air quality detected! Avoid outdoor activities if possible."
-    
+        msg = "🌫️ Alert: Poor air quality detected! Avoid outdoor activities if possible."    
     elif weather_data["weather"][0]["main"] in ["Fog", "Mist"]:
         msg = "🌁 Alert: Reduced visibility detected! Use caution while driving and be aware of your surroundings."
     
@@ -431,8 +426,7 @@ def check_weather_alerts(weather_data):
     elif weather_data["weather"][0]["main"] == "Rain":
             msg = "🌧️ Alert: Heavy rain detected! Use caution while driving and be aware of potential flooding in low-lying areas."
     elif weather_data["weather"][0]["main"] == "Snow":
-            msg = "❄️ Alert: Heavy snow detected! Use caution while driving and be aware of reduced visibility and slippery road conditions."
-    
+            msg = "❄️ Alert: Heavy snow detected! Use caution while driving and be aware of reduced visibility and slippery road conditions."    
     else:
         msg = "No extreme weather conditions detected."
     
@@ -503,10 +497,10 @@ def consume_notification():
 if __name__ == '__main__':
 
     # start the producer and consumer  in a separate threads
-    #producer_thread = threading.Thread(target=check_changes)
-    #producer_thread.start()
-    #consumer_thread = threading.Thread(target=consume_notification)
-    #consumer_thread.start()
+    producer_thread = threading.Thread(target=check_changes)
+    producer_thread.start()
+    consumer_thread = threading.Thread(target=consume_notification)
+    consumer_thread.start()
 
     # start the Flask application
     app.run()
