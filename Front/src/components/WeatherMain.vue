@@ -41,13 +41,13 @@ export default {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    margin-top: 40px;
+    margin-top: 20px;
     margin-bottom: 40px;
     .weather {
       &-temp {
         position: relative;
-        width: 150px;
-        height: 150px;
+        width: 140px;
+        height: 140px;
         display: flex;
         align-items: center;
         justify-content: center;

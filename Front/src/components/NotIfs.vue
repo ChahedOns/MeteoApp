@@ -121,14 +121,14 @@ export default {
 }
 
 .notification-item .location {
-  color: #00ffff; /* dark gray */
-  font-size: 20px;
+  color: #E843A0; /* dark gray */
+  font-size: 18px;
   text-align: justify;
   margin: 0;
 }
 
 .notification-item .message {
-  color: #6A1B9A; /* gray */
+  color: #2C2C2C; /* gray */
   font-size: 18px;
   margin: 0;
 }
@@ -148,7 +148,8 @@ export default {
 .notification-title {
   text-align: center;
   margin-bottom: 10px;
-  font-size: 24px;
-  color: #ff9900; /* dark gray */
+  font-size: 18px;
+  font-weight: bold;
+  color: #EC1F65; /* dark gray */
 }
 </style>
