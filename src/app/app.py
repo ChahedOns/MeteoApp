@@ -61,7 +61,7 @@ def get_forcast_data(api_key,lat,lon):
         return None
     
 def get_city_data(api_key,city):
-    url= f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=5&appid={api_key}"
+    url= f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=1&appid={api_key}"
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
@@ -86,7 +86,7 @@ class User(db.Document, UserMixin):
     mail = db.StringField(required=True)
     pwd= db.StringField(required=True)
     name = db.StringField()
-    birth_date = db.DateTimeField()
+    birth_date = db.DateField()
     location=db.StringField(required=True)
     cities = db.ListField()
     def to_json(self):
@@ -111,7 +111,7 @@ class Place(db.Document):
 
 class Weather(db.Document):
     data=db.DictField()
-    date=db.DateField(default=datetime.datetime.now())
+    date=db.DateTimeField(default=datetime.datetime.utcnow())
     city=db.StringField()
     def to_json(self):
         return{
@@ -124,13 +124,13 @@ class Notification(db.Document):
     user_id=db.IntField()
     msg=db.StringField()
     location=db.StringField()
-    date=db.DateField(default=datetime.datetime.today())
+    date=db.DateTimeField(default=datetime.datetime.utcnow())
 
 class History(db.Document):
     user_id=db.IntField()
     data=db.DictField()
     city=db.StringField()
-    date=db.DateField(default=datetime.datetime.today())
+    date=db.DateTimeField(default=datetime.datetime.utcnow())
 # App Routers
 
 class HistoryCity(db.Document):
@@ -163,13 +163,13 @@ def set_weather():
 
         data= get_weather_data(api_key , request.json.get("city"))
         #Add the searched weather to the user history
-        w= Weather(data=data,city=request.json.get("city"))
+        w= Weather(data=data,city=request.json.get("city").lower())
         h=History(user_id=user.id,data=data,city=request.json.get("city"))
         h.save()
         #Check if the place exist in our data base ! (needed later in the notifications system)
         p = Place.objects(name=request.json.get("city")).first()
         if p == None:
-            p=Place(name=request.json.get("city"),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
+            p=Place(name=request.json.get("city").lower(),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
             p.save()
         w.save()
         return make_response(jsonify("le meteo de la ville ",request.json.get("city"),"est : ", data), 200)
@@ -207,7 +207,7 @@ def get_history():
             return make_response(jsonify(hs), 200)
     else:
         #Get all the user's history
-        u=User.objects(id=request.json['user_id']).first()
+        u=User.objects(id=request.args.get('user_id')).first()
 
         hs= History.objects(user_id=u.id)
         if hs == "None":
@@ -343,7 +343,6 @@ def get_notif():
 @app.route('/city/historique', methods=['GET'])
 def get_city_hist():
     ps = []
-    result = []
     user_id = request.form.get('user_id')
     user = User.objects(id=user_id).first()
     if user is None:
@@ -357,9 +356,8 @@ def get_city_hist():
         p = Place.objects(name=c).first()
         if p:
             ps.append(p)
-    # Set the new history of each city
+
     for t in ps:
-        #data1 = Place.objects(name=t.name).first()
         date_start = datetime.date.fromordinal(datetime.date.today().toordinal() - 15)
         history = get_city_history(t.lat, t.lon, date_start, datetime.date.today())
         data = HistoryCity.objects(city_name=t.name).first()
@@ -372,12 +370,11 @@ def get_city_hist():
         print(history)
     return "success", 200
 
-
     
 
 
 
-    
+
 # ******************** KAFKA ************************
 #Kafka-confluent Configs 
 producer = KafkaProducer(value_serializer=lambda m: json.dumps(m).encode('utf-8'),bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
@@ -492,7 +489,6 @@ def consume_notification():
     finally:
         print("closing consumer")
         consumer.close()
-
 
 if __name__ == '__main__':
 

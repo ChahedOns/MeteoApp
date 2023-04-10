@@ -77,6 +77,7 @@ export default {
                 callback: function (value) {
                   return value + "°C";
                 },
+                stepSize: 2,
               },
               grid: {
                 display: true,
@@ -104,7 +105,8 @@ export default {
 <style lang="less" scoped>
 .chart {
   max-width: 600px;
-  margin: 40px auto;
+  margin: 8px auto;
+  height: 200px;
 }
 </style>
 
