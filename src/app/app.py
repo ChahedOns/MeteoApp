@@ -89,6 +89,7 @@ class User(db.Document, UserMixin):
     birth_date = db.DateField()
     location=db.StringField(required=True)
     cities = db.ListField()
+    mail_alert = db.IntField()
     def to_json(self):
         return {
             "ID": self.id,
@@ -161,13 +162,13 @@ def set_weather():
         # Load the user's data from the database
         user = User.objects(id=request.json['user_id']).first()
 
-        data= get_weather_data(api_key , request.json.get("city"))
+        data= get_weather_data(api_key , request.json.get("city").lower())
         #Add the searched weather to the user history
         w= Weather(data=data,city=request.json.get("city").lower())
-        h=History(user_id=user.id,data=data,city=request.json.get("city"))
+        h=History(user_id=user.id,data=data,city=request.json.get("city").lower())
         h.save()
         #Check if the place exist in our data base ! (needed later in the notifications system)
-        p = Place.objects(name=request.json.get("city")).first()
+        p = Place.objects(name=request.json.get("city").lower()).first()
         if p == None:
             p=Place(name=request.json.get("city").lower(),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
             p.save()
@@ -175,7 +176,7 @@ def set_weather():
         return make_response(jsonify("le meteo de la ville ",request.json.get("city"),"est : ", data), 200)
     else :
         Ls = []
-        for r in Weather.objects(city=request.json.get("city")):
+        for r in Weather.objects(city=request.json.get("city").lower()):
             Ls.append(r)
         if Ls == []:
             return make_response("Aucun meteo sauvgardées dans le systéme!", 201)
@@ -194,7 +195,7 @@ def set_weather():
 def get_history():
     #Get the History of a specific city
     if request.method == "POST":
-        c=request.json.get("city")
+        c=request.json.get("city").lower()
         city=c.lower()
         u=User.objects(id=request.json['user_id']).first()
         print(u.id)
@@ -244,22 +245,24 @@ def register():
         name = request.form.get("name")
         pwd = request.form.get("pwd")
         birth_date = request.form.get("birth_date")
-        location = request.form.get("location").lower()
+        location = request.form.get("location")
         cities = request.form.get("cities").split(':')  # split the : separated list into a Python list --> city1:city2:city3....
         existing_user = User.objects(mail=mail).first()
+        loc=location.lower()
         #Adding all the cities and location to place class 
         if existing_user is None:
-            p= Place.objects(name=location).first()
+            p= Place.objects(name=loc).first()
             #si le cité en question n'existe pas dans la base on l'ajout de plus son meteo courant et on recupére son forcast!
             if p == None:
                 data= get_city_data(api_key , location)
                 if not data: #verification si location saisi par user est valide ou non
                     return make_response("location invalide", 201)
-                p=Place(name=location,lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
+                p=Place(name=loc,lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
                 p.save() 
+            cities1 = cities
             for i in range(len(cities)):
-                cities[i] = cities[i].lower()
-            for c in cities:                                
+                cities1[i] = cities[i].lower()
+            for c in cities1:                                
                 p1= Place.objects(name=c).first()
                 if p1 == None:
                     data1=get_city_data(api_key,c)
@@ -349,11 +352,12 @@ def get_city_hist():
         return jsonify({'error': 'User not found.'}), 404
     # Add all the user's favorites and his own location
     if user.location:
-        p = Place.objects(name=user.location).first()
+        loc = user.location
+        p = Place.objects(name=loc.lower()).first()
         if p:
             ps.append(p)
     for c in user.cities:
-        p = Place.objects(name=c).first()
+        p = Place.objects(name=c.lower()).first()
         if p:
             ps.append(p)
 
@@ -369,7 +373,6 @@ def get_city_hist():
         print(data)
         print(history)
     return "success", 200
-
     
 
 
@@ -472,13 +475,14 @@ def consume_notification():
                     for u in users:
                         #Create for each user a new notification 
                         #Specific notification for the user's location 
-                        if u.location == message.value["location"]:
+                        loc =u.location
+                        if loc.lower() == message.value["location"]:
                             n=Notification(user_id=u.id,msg=message.value["msg"],location=message.value["location"])
                             n.save()
                         #Specific notification for the user's favorite cities
                         else:
                             for city in u.cities:
-                                if city == message.value["location"]:
+                                if city.lower() == message.value["location"]:
                                     n=Notification(user_id=u.id,msg=message.value["msg"],location=city)
                                     n.save()
             consumer.commit()
