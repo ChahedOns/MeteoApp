@@ -204,7 +204,7 @@ def get_history():
             return make_response(jsonify(hs), 200)
     else:
         #Get all the user's history
-        u=User.objects(id=request.json['user_id']).first()
+        u=User.objects(id=request.args.get('user_id')).first()
 
         hs= History.objects(user_id=u.id)
         if hs == "None":

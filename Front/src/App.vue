@@ -3,14 +3,15 @@
     <transition name="fade" mode="out-in" appear>
       <div class="card">
         <WeatherSearch />
+        <div class="history-stuff" v-if="isLoggedIn" @click="toggleHistoryModal">Check your history here !</div>
         <WeatherMain />
         <WeatherInfo />
         <WeekChart :forecastData="getForecastData"/>
+
         <div class="button-container">
           <button v-if="!isLoggedIn " @click="toggleLoginModal" class="login">Log In</button>
           <button v-if="!isLoggedIn " @click="toggleSignupModal" class="signup">Sign Up</button>
           <button v-if="isLoggedIn " @click="logout">Log Out</button>
-          <button v-if="isLoggedIn" @click="toggleHistoryModal">Historique</button>
         </div>
 
       </div>
@@ -150,6 +151,7 @@ export default {
 @import url("https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,700;0,800;0,900;1,300;1,500&display=swap");
 :root {
   --cardWidth: 725px;
+  --cardHeight: 785px;
   --darkColor: #666;
   --grayColor: #999;
   --cardBgColor: #f1f1f1;
@@ -175,6 +177,22 @@ export default {
   box-sizing: border-box;
   font-family: "Jost", sans-serif;
 }
+.history-stuff {
+  display: inline-block;
+  text-decoration: none;
+  border-bottom: 2px solid #000;
+  border-color: #00ADEF;
+  cursor: pointer;
+  text-align: center;
+  width: 225px;
+  margin-left: 32.5%;
+  margin-top: 15px;
+}
+
+.history-stuff:hover {
+  background-color: #00ADEF;
+  color: #fff;
+}
 body {
   background-color: fade(#000, 30);
   overflow: hidden;
@@ -188,6 +206,7 @@ body {
 
 .card {
   max-width: var(--cardWidth);
+  max-height: var(--cardHeight);
   width: 100%;
   padding: 40px;
   margin: 20px;
@@ -268,7 +287,7 @@ button.login:hover, button.signup:hover {
 .button-container {
   display: flex;
   justify-content: center;
-  margin-top: 20px;
+  margin-top: 10px;
 }
 
 
