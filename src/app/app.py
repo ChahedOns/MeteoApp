@@ -13,7 +13,7 @@ from kafka import KafkaProducer ,KafkaConsumer
 from flask_cors import CORS
 import requests
 import threading
-
+from datetime import datetime as dt
 
 # configurations !
 app = Flask(__name__)
@@ -69,11 +69,13 @@ def get_city_data(api_key,city):
     else:
         return None
     
-def get_city_history(lat,lon,date_dep,date_fin):
-    url= f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}&start_date={date_dep}&timezone=GMT&end_date={date_fin}&daily=temperature_2m_max"
+def get_city_history(lat, lon, start_date, end_date):
+    #url= f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}&start_date={date_dep}&timezone=GMT&end_date={date_fin}&daily=temperature_2m_max"
+    url = f"https://api.weatherbit.io/v2.0/history/daily?key=6f2c43a59b5a4476a4553686535896dd&lat={lat}&lon={lon}&start_date={start_date}&end_date={end_date}&units=M"
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
+        print(data)
         return data
     else:
         return None
@@ -134,8 +136,10 @@ class History(db.Document):
 
 class HistoryCity(db.Document):
     city_name=db.StringField()
-    data=db.DictField()
-
+    #data=db.DictField()
+    date=db.DateField()
+    weather=db.FloatField()
+    
 
 @app.route("/cities", methods=['POST', 'GET'])
 def get_places():
@@ -337,30 +341,38 @@ def get_notif():
     return jsonify(notifications), 200
 
 
-@app.route('/city/historique',methods=['GET'])
+@app.route('/city/historique', methods=['GET'])
 def get_city_hist():
-    ps=[]
-    result=[]
-    user_id=request.args.get('user_id')
-    user=User.objects(id=user_id).first()
-    #Add all the user's favorites and his own location
-    p=Place.objects(name=user.location)
-    ps.append(p)
+    ps = []
+    result = []
+    user_id = request.form.get('user_id')
+    user = User.objects(id=user_id).first()
+    if user is None:
+        return jsonify({'error': 'User not found.'}), 404
+    # Add all the user's favorites and his own location
+    if user.location:
+        p = Place.objects(name=user.location).first()
+        if p:
+            ps.append(p)
     for c in user.cities:
-        ps.append(c)
-    #Set the new history of each city
-    for p in ps:
-        data1=get_city_data(api_key,p)
-        date_deb= datetime.date.fromordinal(datetime.date.today().toordinal()-15)
-        history=get_city_history(data1[0]["lat"],data1[0]["lon"],date_deb,datetime.date.today())
-        hc=HistoryCity.objects(city_name=p).first()
-        if hc == None:
-            hc=HistoryCity(city_name=p,data=history["daily"])
-        else:
-            hc.update(data=history)
-        #Prepare the user's result data!
-        result.append({'city':p,'history':history["daily"]})
-    return jsonify(result) , 200
+        p = Place.objects(name=c).first()
+        if p:
+            ps.append(p)
+    # Set the new history of each city
+    for t in ps:
+        #data1 = Place.objects(name=t.name).first()
+        date_start = datetime.date.fromordinal(datetime.date.today().toordinal() - 15)
+        history = get_city_history(t.lat, t.lon, date_start, datetime.date.today())
+        data = HistoryCity.objects(city_name=t.name).first()
+        if data is None:
+            for i in range(15):
+                data = HistoryCity(city_name=t.name, date= history['data'][i]['datetime'], weather=history['data'][i]['temp'])
+                data.save()
+
+        print(data)
+        print(history)
+    return "success", 200
+
 
     
 
@@ -390,43 +402,67 @@ def produce_weather_data(topic, msg ,location):
     producer.flush()
     print(f'Production processing on "{topic}": {msg} , {location}')
 
+
+def check_weather_alerts(weather_data):
+    msg = ""
+    
+    if weather_data["weather"][0]["main"] == "Thunderstorm":
+        msg = "⚡⛈️ Alert: Thunderstorm detected! Please stay indoors and avoid exposed areas."
+    
+    elif weather_data["weather"][0]["main"] == "Tornado":
+        msg = "🌪️ Alert: Tornado detected! Seek shelter immediately in a basement or interior room on the lowest floor."
+    
+    elif weather_data["weather"][0]["main"] == "Squall":
+        msg = "💨 Alert: Squall detected! Avoid going outside and secure all loose objects."
+    
+    elif weather_data["weather"][0]["main"] in ["Haze", "Smoke", "Dust", "Ash"]:
+        msg = "🌫️ Alert: Poor air quality detected! Avoid outdoor activities if possible."
+    
+    elif weather_data["weather"][0]["main"] in ["Fog", "Mist"]:
+        msg = "🌁 Alert: Reduced visibility detected! Use caution while driving and be aware of your surroundings."
+    
+    # Check for extreme temperatures
+    elif weather_data["main"]["temp"] < -10:
+        msg = "🌡️ Alert: Extremely low temperatures detected! Dress in multiple layers and cover all exposed skin to prevent frostbite. Avoid prolonged outdoor exposure and stay hydrated."
+    elif weather_data["main"]["temp"] > 40:
+        msg = "🌡️ Alert: Extremely high temperatures detected! Wear light, loose-fitting clothing and a hat to stay cool. Stay hydrated and avoid prolonged outdoor exposure during peak sun hours."
+    
+    # Check for heavy precipitation
+    elif weather_data["weather"][0]["main"] == "Rain":
+            msg = "🌧️ Alert: Heavy rain detected! Use caution while driving and be aware of potential flooding in low-lying areas."
+    elif weather_data["weather"][0]["main"] == "Snow":
+            msg = "❄️ Alert: Heavy snow detected! Use caution while driving and be aware of reduced visibility and slippery road conditions."
+    
+    else:
+        msg = "No extreme weather conditions detected."
+    
+    return msg
+
 #The con job function 
 def check_changes():
     while True:
         #Check all the cities
         ps= Place.objects()
         for p in ps:
-            weather_data = get_weather_data(api_key, p.name)
-            if weather_data is not None:
-                #Prepare the msg! 
-                weatherStatus= weather_data["weather"][0]["main"]
-                if weatherStatus == "Snow":
-                    msg = "Snowy Day Alert !Stay at home, drink something warm! Snowy Day!"
-                elif weatherStatus == "Rain" or weatherStatus=="Shower Rain" or weatherStatus=="Thunderstorm":
-                    msg = "Rainy Day Alert !Don't forget your umbrella! it may rains today!"
-                elif weatherStatus == "Mist":
-                    msg = "Becareful and drive slowly today!"
-                elif weatherStatus== "Clouds":
-                    msg="Grey Day Alert It may be a sad weather today! Be productive"
-                else:
-                    msg=weatherStatus
-                #Check the last notification on that location!
-                last_notif = Notification.objects(date=datetime.date.today(),location=p.name).first()
+            if p.name != None:
+                weather_data = get_weather_data(api_key, p.name)
+                if weather_data is not None:
+                    alert_msg = check_weather_alerts(weather_data)                
+                    #Check the last notification on that location!
+                    last_notif = Notification.objects(date=datetime.date.today(),location=p.name).first()
 
-                if last_notif is not None:
-                    for l in last_notif:
-                        #There is changes!
-                        if msg != l.msg:
-                            #Sending new notifiction with changes
+                    if last_notif is not None:
+                        if last_notif != alert_msg:                    
+                                #Sending new notifiction with changes
                             print("Detecting changes!")
-                            produce_weather_data('Check_notif',msg,p.name)
+                            produce_weather_data('Check_notif',alert_msg,p.name)
                         else:
-                            pass
+                            print("no changes detected")
+                    else:
+                        #Produce new notification!
+                        produce_weather_data('Check_notif',alert_msg,p.name)
                 else:
-                    #Produce new notification!
-                    produce_weather_data('Check_notif',msg,p.name)
-            else:
-                print('Error retrieving weather data.')
+                    print('Error retrieving weather data.')
         time.sleep(15)
 
 #The consumer function 
@@ -467,10 +503,10 @@ def consume_notification():
 if __name__ == '__main__':
 
     # start the producer and consumer  in a separate threads
-    producer_thread = threading.Thread(target=check_changes)
-    producer_thread.start()
-    consumer_thread = threading.Thread(target=consume_notification)
-    consumer_thread.start()
+    #producer_thread = threading.Thread(target=check_changes)
+    #producer_thread.start()
+    #consumer_thread = threading.Thread(target=consume_notification)
+    #consumer_thread.start()
 
     # start the Flask application
     app.run()
