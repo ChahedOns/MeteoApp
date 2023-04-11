@@ -1,13 +1,13 @@
 <template>
   <div class="container">
     <form class="form" v-on:submit.prevent="getCountryHistory">
-      <label for="city" class="form-label">Please search a city or click on the button below to get all your history !</label>
+      <label for="city" class="form-label">Please search a city or click on the buttons below to get all your history or just the ones from your favorite cities !</label>
       <div class="form-input-group">
         <input type="text" v-model="city" id="city" name="city" class="form-input" required>
         <button type="submit" class="form-button">Get History</button>
       </div>
     </form>
-    <div class="list-container">
+    <div class="list-container" v-if="getCountryHistoryCalled || getAllHistoryCalled">
       <ul class="list">
         <li v-if="response.length === 0 && getCountryHistoryCalled" class="list-item no-data-message">
           You haven't searched this city yet !
@@ -18,11 +18,22 @@
         <li v-for="item in response" :key="item.id" class="list-item">
           <div class="list-item-city">{{ item.city }}</div>
           <div class="list-item-data">{{ item.data.main.temp }}°C</div>
-          <div class="list-item-date">{{ formatDate(item.date) }}</div>
+          <div class="list-item-date">{{ formatDate(item.date.$date) }}</div>
+        </li>
+      </ul>
+    </div>
+    <div class="list-container" v-if="getFavHistoryCalled">
+      <ul class="list">
+        <li v-for="item in favHistory" :key="item.id" class="list-item">
+          <div class="list-item-city">{{ item.city_name }}</div>
+          <div class="list-item-data">{{ item.weather }}°C</div>
+          <div class="list-item-date">{{ formatDateFav(item.date.$date) }}</div>
         </li>
       </ul>
     </div>
     <button class="button" @click="getAllHistory">Get All History</button>
+    <p></p>
+    <button class="button" @click="getFavHistory">15 days History</button>
   </div>
 </template>
 
@@ -35,8 +46,11 @@ export default {
     return {
       city: '',
       response: [],
+      favHistory: [],
+      getFavHistoryCalled: false,
       getCountryHistoryCalled: false,
-      getAllHistoryCalled: false
+      getAllHistoryCalled: false,
+      test: new Date('2023-04-06T00:00:00Z').toLocaleDateString('en-US', {day: '2-digit', month: '2-digit', year: 'numeric'})
     };
   },
   methods: {
@@ -50,6 +64,7 @@ export default {
             this.response = response.data;
             this.getCountryHistoryCalled = true
             this.getAllHistoryCalled = false
+            this.getFavHistoryCalled = false
           })
           .catch(error => {
             console.error('Error:', error);
@@ -64,23 +79,68 @@ export default {
           }
         });
         this.response = response.data;
-        this.getCountryHistoryCalled = true
-        this.getAllHistoryCalled = false
+
+        this.getCountryHistoryCalled = false
+        this.getAllHistoryCalled = true
+        this.getFavHistoryCalled = false
+
+      } catch (error) {
+        console.log(error);
+      }
+    },
+    async getFavHistory() {
+      try {
+
+        const userId = localStorage.getItem('user_id'); // Get user ID from local storage
+        const response = await axios.get('http://127.0.0.1:5000/city/historique', {
+          params: {
+            user_id:  userId
+          }
+        });
+        this.favHistory = response.data;
+        this.getFavHistoryCalled = true;
+        this.getAllHistoryCalled = false;
+        this.getCountryHistoryCalled = false;
+        console.log(response.data)
 
       } catch (error) {
         console.log(error);
       }
     },
     formatDate(date) {
-      if (!date) {
-        return "";
+      const inputDate = moment.utc(date);
+      const today = moment();
+      const diffInDays = today.diff(inputDate, 'days');
+      if (diffInDays <= 7) {
+        // if the date is less than a week from today, return the day of the week
+        return inputDate.calendar();
+      } else if (diffInDays <= 14) {
+        // if the date is exactly one week ago, return "Last week"
+        return "Last week";
+      } else {
+        // if the date is more than a week from today, return the number of weeks ago
+        const weeksAgo = Math.floor(diffInDays / 7);
+        return `${weeksAgo} weeks ago`;
       }
+    },
+    formatDateFav(date) {
+      const inputDate = moment(date);
+      const today = moment();
 
-      // convert to CET timezone
-      const dateTime = moment.utc(date).utcOffset("+01:00");
+      const diffInDays = today.diff(inputDate, 'days');
 
-      // format the date
-      return dateTime.format("DD/MM/YY HH:mm");
+      if (diffInDays === 0) {
+        return 'Today';
+      } else if (diffInDays === 1) {
+        return 'Yesterday';
+      } else if (diffInDays > 1 && diffInDays < 7) {
+        return `${diffInDays} days ago`;
+      } else if (diffInDays >= 7 && diffInDays <= 14) {
+        return 'Last week';
+      } else {
+        const weeksAgo = Math.floor(diffInDays / 7);
+        return `${weeksAgo} weeks ago`;
+      }
     }
   }
 };
@@ -102,7 +162,7 @@ export default {
   max-width: 275px;
   font-weight: bold;
   color: #333;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .form-input-group {

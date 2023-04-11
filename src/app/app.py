@@ -89,7 +89,7 @@ class User(db.Document, UserMixin):
     birth_date = db.DateField()
     location=db.StringField(required=True)
     cities = db.ListField()
-    mail_alert = db.IntField()
+    mail_alert = db.BooleanField(default=False)
     def to_json(self):
         return {
             "ID": self.id,
@@ -247,9 +247,10 @@ def register():
         birth_date = request.form.get("birth_date")
         location = request.form.get("location")
         cities = request.form.get("cities").split(':')  # split the : separated list into a Python list --> city1:city2:city3....
+        mail_alert = request.form.get("mail_alert")
         existing_user = User.objects(mail=mail).first()
         loc=location.lower()
-        #Adding all the cities and location to place class 
+        #Adding all the cities and location to place class
         if existing_user is None:
             p= Place.objects(name=loc).first()
             #si le cité en question n'existe pas dans la base on l'ajout de plus son meteo courant et on recupére son forcast!
@@ -258,11 +259,11 @@ def register():
                 if not data: #verification si location saisi par user est valide ou non
                     return make_response("location invalide", 201)
                 p=Place(name=loc,lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
-                p.save() 
+                p.save()
             cities1 = cities
             for i in range(len(cities)):
                 cities1[i] = cities[i].lower()
-            for c in cities1:                                
+            for c in cities1:
                 p1= Place.objects(name=c).first()
                 if p1 == None:
                     data1=get_city_data(api_key,c)
@@ -271,9 +272,9 @@ def register():
                     p1=Place(name=c,lat=float(data1[0]["lat"]),lon=float(data1[0]["lon"]))
                     p1.save()
 
-                
+
             hashpass = generate_password_hash(pwd, method='sha256')
-            v = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location, cities=cities)
+            v = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location, cities=cities, mail_alert = mail_alert)
             max_id = 0      #assign an id to the user
             for u in User.objects:
                 if u.id > max_id:
@@ -283,6 +284,7 @@ def register():
             return make_response("Bienvenue à MeteoApp", 200)
         else:
             return make_response("Compte existant", 201)
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -346,13 +348,13 @@ def get_notif():
 @app.route('/city/historique', methods=['GET'])
 def get_city_hist():
     ps = []
-    user_id = request.form.get('user_id')
-    user = User.objects(id=user_id).first()
+    user = User.objects(id=request.args.get('user_id')).first()
     if user is None:
         return jsonify({'error': 'User not found.'}), 404
+    loc = user.location
+
     # Add all the user's favorites and his own location
-    if user.location:
-        loc = user.location
+    if loc:
         p = Place.objects(name=loc.lower()).first()
         if p:
             ps.append(p)
@@ -369,10 +371,14 @@ def get_city_hist():
             for i in range(15):
                 data = HistoryCity(city_name=t.name, date= history['data'][i]['datetime'], weather=history['data'][i]['temp'])
                 data.save()
+    ls = []
+    for i in HistoryCity.objects(city_name=loc.lower()):
+        ls.append(i)
+
 
         print(data)
         print(history)
-    return "success", 200
+    return make_response(jsonify(ls), 200)
     
 
 
@@ -428,7 +434,7 @@ def check_weather_alerts(weather_data):
     elif weather_data["weather"][0]["main"] == "Snow":
             msg = "❄️ Alert: Heavy snow detected! Use caution while driving and be aware of reduced visibility and slippery road conditions."    
     else:
-        msg = "No extreme weather conditions detected."
+        msg = "🌤️ No severe weather conditions detected."
     
     return msg
 
@@ -436,6 +442,7 @@ def check_weather_alerts(weather_data):
 def check_changes():
     while True:
         #Check all the cities
+        Notification.objects().delete()
         ps= Place.objects()
         for p in ps:
             if p.name != None:
