@@ -220,6 +220,7 @@ body {
   align-items: center;
   justify-content: center;
   height: 100vh;
+  overflow-y: auto;
 }
 
 .card {
