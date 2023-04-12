@@ -13,6 +13,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet/dist/images/marker-icon.png';
 import 'leaflet/dist/images/marker-icon-2x.png';
 import 'leaflet/dist/images/marker-shadow.png';
+import { mapGetters } from "vuex";
 
 export default {
   name: 'TemperatureMap',
@@ -25,8 +26,14 @@ export default {
       apiKey: 'e1d249091bc4e5afc3580b698bdecc7c',
     };
   },
+
+  computed: {
+    ...mapGetters(["getWeatherMain"])
+  },
   mounted() {
-    this.map = L.map(this.$refs.mapContainer).setView([48.856613, 2.352222], 10);
+    const lat = this.getWeatherMain.lat
+    const lon = this.getWeatherMain.lon
+    this.map = L.map(this.$refs.mapContainer).setView([lat, lon], 9);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
@@ -41,7 +48,7 @@ export default {
 
     // Create a marker at the specified location
 
-    const marker = L.marker([48.856613, 2.352222], {
+    const marker = L.marker([lat, lon], {
       icon: L.icon({
         iconUrl: require('leaflet/dist/images/marker-icon.png'),
         iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
