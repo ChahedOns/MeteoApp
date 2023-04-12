@@ -1,12 +1,14 @@
 <template>
   <div class="container">
     <form class="form" v-on:submit.prevent="getCountryHistory">
-      <label for="city" class="form-label">Please search a city or click on the buttons below to get all your history or just the ones from your favorite cities !</label>
+      <label for="city" class="form-label">Please search a city or click on the button below to get all consultation your history !</label>
       <div class="form-input-group">
         <input type="text" v-model="city" id="city" name="city" class="form-input" required>
         <button type="submit" class="form-button">Get History</button>
       </div>
     </form>
+
+    <div class="label" v-if="getAllHistoryCalled">All your weather History</div>
     <div class="list-container" v-if="getCountryHistoryCalled || getAllHistoryCalled">
       <ul class="list">
         <li v-if="response.length === 0 && getCountryHistoryCalled" class="list-item no-data-message">
@@ -22,6 +24,9 @@
         </li>
       </ul>
     </div>
+    <button class="button" @click="getAllHistory">Get All History</button>
+    <hr class="styled-hr">
+    <div class="label" v-if="getFavHistoryCalled">Weather of your favorite cities</div>
     <div class="list-container" v-if="getFavHistoryCalled">
       <ul class="list">
         <li v-for="item in favHistory" :key="item.id" class="list-item">
@@ -31,8 +36,8 @@
         </li>
       </ul>
     </div>
-    <button class="button" @click="getAllHistory">Get All History</button>
-    <p></p>
+
+    <p class="label">Click on this button instead to get your favorite cities 15 days weather history !</p>
     <button class="button" @click="getFavHistory">15 days History</button>
   </div>
 </template>
@@ -50,7 +55,8 @@ export default {
       getFavHistoryCalled: false,
       getCountryHistoryCalled: false,
       getAllHistoryCalled: false,
-      test: new Date('2023-04-06T00:00:00Z').toLocaleDateString('en-US', {day: '2-digit', month: '2-digit', year: 'numeric'})
+      test: false,
+
     };
   },
   methods: {
@@ -153,7 +159,7 @@ export default {
 }
 
 .form {
-  margin-bottom: 1rem;
+  margin-bottom: 0.3rem;
 }
 
 .form-label {
@@ -162,7 +168,15 @@ export default {
   max-width: 275px;
   font-weight: bold;
   color: #333;
-  font-size: 15px;
+  font-size: 14px;
+}
+.label{
+  display: block;
+  margin-top: 0.7rem;
+  max-width: 275px;
+  font-weight: bold;
+  color: #333;
+  font-size: 14px;
 }
 
 .form-input-group {
@@ -188,6 +202,7 @@ export default {
   font-size: 1rem;
   cursor: pointer;
   display: none;
+  margin-bottom: 15px;
 }
 
 .button {
@@ -199,7 +214,7 @@ export default {
   font-size: 1rem;
   cursor: pointer;
   margin-left: 65px;
-  margin-top: 20px;
+  margin-top: 15px;
 }
 
 .list-container {
@@ -247,5 +262,12 @@ export default {
   border: none;
   color: #721c24;
   font-weight: bold;
+}
+.styled-hr {
+  border: none;
+  height: 2px;
+  background-color: #b1b0b0;
+  margin: 15px 0;
+  padding: 0;
 }
 </style>

@@ -345,6 +345,7 @@ def get_notif():
     return jsonify(notifications), 200
 
 
+
 @app.route('/city/historique', methods=['GET'])
 def get_city_hist():
     ps = []
@@ -373,13 +374,13 @@ def get_city_hist():
                 data.save()
     ls = []
     for i in HistoryCity.objects(city_name=loc.lower()):
-        ls.append(i)
+        for j in range(16):
+            if(datetime.date.fromordinal(datetime.date.today().toordinal() - j)==i.date):
+                ls.append(i)
+    # Tri des valeurs en fonction de leur date
+    ls_trie = sorted(ls, key=lambda x: x.date, reverse=True)
 
-
-        print(data)
-        print(history)
-    return make_response(jsonify(ls), 200)
-    
+    return make_response(jsonify(ls_trie), 200)
 
 
 
@@ -434,7 +435,7 @@ def check_weather_alerts(weather_data):
     elif weather_data["weather"][0]["main"] == "Snow":
             msg = "❄️ Alert: Heavy snow detected! Use caution while driving and be aware of reduced visibility and slippery road conditions."    
     else:
-        msg = "🌤️ No severe weather conditions detected."
+            msg = "🌤️ No severe weather conditions detected."
     
     return msg
 
@@ -504,10 +505,10 @@ def consume_notification():
 if __name__ == '__main__':
 
     # start the producer and consumer  in a separate threads
-    producer_thread = threading.Thread(target=check_changes)
-    producer_thread.start()
-    consumer_thread = threading.Thread(target=consume_notification)
-    consumer_thread.start()
+    #producer_thread = threading.Thread(target=check_changes)
+    #producer_thread.start()
+    #consumer_thread = threading.Thread(target=consume_notification)
+    #consumer_thread.start()
 
     # start the Flask application
     app.run()
