@@ -23,16 +23,17 @@
           <label for="signup-location">Location:</label>
           <input type="text" id="signup-location" name="location" required>
         </div>
-        <div>
-          <label>
-            <input type="checkbox" id="weather-notifications" name="weather-notifications">
-            Check to get notified on extreme weather conditions in your location !
-          </label>
-        </div>
+
 
         <div>
           <label for="signup-cities">Enter your favorite cities here (separatated by ":") to get notifications about them !</label>
           <input type="text" id="signup-cities" name="cities" required>
+        </div>
+        <div>
+          <label class="notif">
+            <input type="checkbox" id="weather-notifications" name="weather-notifications">
+            Check to get notified on extreme weather conditions in your location !
+          </label>
         </div>
         <div>
           <p v-if="responseMessage" class="error-message">{{responseMessage}}</p>
@@ -98,6 +99,9 @@ export default {
 </script>
 
 <style scoped>
+.notif{
+  font-weight: bold;
+}
 .modal {
   position: fixed;
   top: 0;

@@ -4,9 +4,19 @@
       <div class="card">
         <WeatherSearch />
         <div class="history-stuff" v-if="isLoggedIn" @click="toggleHistoryModal">Check your history here !</div>
+        <div class="history-stuff"  @click="toggleMapModal">Check your weather map here !</div>
+        <transition name="fade" mode="out-in">
+          <div v-if="showMap" class="modal-wrapper">
+            <div class="modal-backdrop" @click="toggleMapModal"></div>
+            <div class="modal-content">
+              <WeatherMap />
+            </div>
+          </div>
+        </transition>
         <WeatherMain />
         <WeatherInfo />
         <WeekChart :forecastData="getForecastData"/>
+
 
         <div class="button-container">
           <button v-if="!isLoggedIn " @click="toggleLoginModal" class="login">Log In</button>
@@ -61,6 +71,7 @@ import SignUp from "@/components/SignUp";
 import axios from "axios";
 import NotIfs from "@/components/NotIfs";
 import HistoryData from "@/components/HistoryData";
+import WeatherMap from "@/components/WeatherMap";
 
 
 
@@ -75,7 +86,8 @@ export default {
     LogIn,
     SignUp,
     NotIfs,
-    HistoryData
+    HistoryData,
+    WeatherMap
 
 
   },
@@ -85,7 +97,8 @@ export default {
       showLogin: false,
       showButton: true,
       isLoggedIn: false,
-      showHistory: false
+      showHistory: false,
+      showMap: false
     };
   },
   computed: {
@@ -102,6 +115,11 @@ export default {
       this.showLogin = !this.showLogin;
       this.showButton = false;
     },
+    toggleMapModal(){
+      this.showMap = !this.showMap;
+      this.showButton = false;
+    },
+
     toggleSignupModal(){
       this.showSignup = !this.showSignup;
       this.showButton = false;
@@ -151,7 +169,7 @@ export default {
 @import url("https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,400;0,700;0,800;0,900;1,300;1,500&display=swap");
 :root {
   --cardWidth: 725px;
-  --cardHeight: 785px;
+  --cardHeight: 825px;
   --darkColor: #666;
   --grayColor: #999;
   --cardBgColor: #f1f1f1;
