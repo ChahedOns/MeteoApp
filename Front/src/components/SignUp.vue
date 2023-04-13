@@ -2,7 +2,7 @@
   <div class="modal">
     <div v-if="showSignupModal" class="modal-content">
       <h2>Sign Up</h2>
-      <form ref="singupForm" id="signup-form" v-if="!isLoggedIn">
+      <form ref="singupForm" id="signup-form" v-if="!isSignedIn">
         <div>
           <label for="signup-email">Email:</label>
           <input type="email" id="signup-email" name="mail" required>
@@ -17,15 +17,23 @@
         </div>
         <div>
           <label for="signup-birth_date">Birth Date:</label>
-          <input type="date" id="signup-birth_date" name="birth_date" required>
+          <input type="date" id="signup-birth_date" name="birth_date" required :max="maxDate">
         </div>
         <div>
           <label for="signup-location">Location:</label>
           <input type="text" id="signup-location" name="location" required>
         </div>
+
+
         <div>
-          <label for="signup-cities">Cities (separated by a colon ':'):</label>
+          <label for="signup-cities">Enter your favorite cities here (separatated by ":") to get notifications about them !</label>
           <input type="text" id="signup-cities" name="cities" required>
+        </div>
+        <div>
+          <label class="notif">
+            <input type="checkbox" id="weather-notifications" name="weather-notifications">
+            Check to get notified on extreme weather conditions in your location !
+          </label>
         </div>
         <div>
           <p v-if="responseMessage" class="error-message">{{responseMessage}}</p>
@@ -35,7 +43,7 @@
           <button @click.prevent="closeModal" class="btn-secondary">Cancel</button>
         </div>
       </form>
-      <div v-if="isLoggedIn">
+      <div v-if="isSignedIn">
         <p class="welcome-message">Welcome aboard, You have successfully Signed In !</p>
         <button @click.prevent="closeModal" class="btn-secondary">Close</button>
       </div>
@@ -50,12 +58,19 @@ const { localStorage } = window;
 export default {
   data() {
     return {
-      isLoggedIn: false,
+      isSignedIn: false,
       showSignupModal: true,
-      responseMessage: null
+      responseMessage: null,
+      maxDate: this.formatDate(new Date())
     }
   },
   methods: {
+    formatDate(date) {
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    },
     signup() {
       const formData = new FormData(document.getElementById('signup-form'));
       axios.post('http://127.0.0.1:5000/register', formData)
@@ -64,7 +79,7 @@ export default {
             localStorage.setItem('token', response.data.token);
             this.responseMessage = response.data;
             if(response.status === 200) {
-              this.isLoggedIn = true;
+              this.isSignedIn = true;
               console.log(response.data);
               this.responseMessage = response.data;
             }
@@ -84,6 +99,9 @@ export default {
 </script>
 
 <style scoped>
+.notif{
+  font-weight: bold;
+}
 .modal {
   position: fixed;
   top: 0;

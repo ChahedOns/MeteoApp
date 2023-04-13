@@ -13,7 +13,7 @@ from kafka import KafkaProducer ,KafkaConsumer
 from flask_cors import CORS
 import requests
 import threading
-
+from datetime import datetime as dt
 
 # configurations !
 app = Flask(__name__)
@@ -69,11 +69,12 @@ def get_city_data(api_key,city):
     else:
         return None
     
-def get_city_history(lat,lon,date_dep,date_fin):
-    url= f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}&start_date={date_dep}&timezone=GMT&end_date={date_fin}&daily=temperature_2m_max"
+def get_city_history(lat, lon, start_date, end_date):
+    url = f"https://api.weatherbit.io/v2.0/history/daily?key=6f2c43a59b5a4476a4553686535896dd&lat={lat}&lon={lon}&start_date={start_date}&end_date={end_date}&units=M"
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
+        print(data)
         return data
     else:
         return None
@@ -85,9 +86,10 @@ class User(db.Document, UserMixin):
     mail = db.StringField(required=True)
     pwd= db.StringField(required=True)
     name = db.StringField()
-    birth_date = db.DateTimeField()
+    birth_date = db.DateField()
     location=db.StringField(required=True)
     cities = db.ListField()
+    mail_alert = db.BooleanField(default=False)
     def to_json(self):
         return {
             "ID": self.id,
@@ -134,8 +136,10 @@ class History(db.Document):
 
 class HistoryCity(db.Document):
     city_name=db.StringField()
-    data=db.DictField()
-
+    #data=db.DictField()
+    date=db.DateField()
+    weather=db.FloatField()
+    
 
 @app.route("/cities", methods=['POST', 'GET'])
 def get_places():
@@ -158,13 +162,13 @@ def set_weather():
         # Load the user's data from the database
         user = User.objects(id=request.json['user_id']).first()
 
-        data= get_weather_data(api_key , request.json.get("city"))
+        data= get_weather_data(api_key , request.json.get("city").lower())
         #Add the searched weather to the user history
         w= Weather(data=data,city=request.json.get("city").lower())
-        h=History(user_id=user.id,data=data,city=request.json.get("city"))
+        h=History(user_id=user.id,data=data,city=request.json.get("city").lower())
         h.save()
         #Check if the place exist in our data base ! (needed later in the notifications system)
-        p = Place.objects(name=request.json.get("city")).first()
+        p = Place.objects(name=request.json.get("city").lower()).first()
         if p == None:
             p=Place(name=request.json.get("city").lower(),lat=float(data["coord"]["lat"]),lon=float(data["coord"]["lon"]))
             p.save()
@@ -172,7 +176,7 @@ def set_weather():
         return make_response(jsonify("le meteo de la ville ",request.json.get("city"),"est : ", data), 200)
     else :
         Ls = []
-        for r in Weather.objects(city=request.json.get("city")):
+        for r in Weather.objects(city=request.json.get("city").lower()):
             Ls.append(r)
         if Ls == []:
             return make_response("Aucun meteo sauvgardées dans le systéme!", 201)
@@ -191,7 +195,7 @@ def set_weather():
 def get_history():
     #Get the History of a specific city
     if request.method == "POST":
-        c=request.json.get("city")
+        c=request.json.get("city").lower()
         city=c.lower()
         u=User.objects(id=request.json['user_id']).first()
         print(u.id)
@@ -204,7 +208,7 @@ def get_history():
             return make_response(jsonify(hs), 200)
     else:
         #Get all the user's history
-        u=User.objects(id=request.json['user_id']).first()
+        u=User.objects(id=request.args.get('user_id')).first()
 
         hs= History.objects(user_id=u.id)
         if hs == "None":
@@ -241,22 +245,25 @@ def register():
         name = request.form.get("name")
         pwd = request.form.get("pwd")
         birth_date = request.form.get("birth_date")
-        location = request.form.get("location").lower()
+        location = request.form.get("location")
         cities = request.form.get("cities").split(':')  # split the : separated list into a Python list --> city1:city2:city3....
+        mail_alert = request.form.get("mail_alert")
         existing_user = User.objects(mail=mail).first()
-        #Adding all the cities and location to place class 
+        loc=location.lower()
+        #Adding all the cities and location to place class
         if existing_user is None:
-            p= Place.objects(name=location).first()
+            p= Place.objects(name=loc).first()
             #si le cité en question n'existe pas dans la base on l'ajout de plus son meteo courant et on recupére son forcast!
             if p == None:
                 data= get_city_data(api_key , location)
                 if not data: #verification si location saisi par user est valide ou non
                     return make_response("location invalide", 201)
-                p=Place(name=location,lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
-                p.save() 
+                p=Place(name=loc,lat=float(data[0]["lat"]),lon=float(data[0]["lon"]))
+                p.save()
+            cities1 = cities
             for i in range(len(cities)):
-                cities[i] = cities[i].lower()
-            for c in cities:                                
+                cities1[i] = cities[i].lower()
+            for c in cities1:
                 p1= Place.objects(name=c).first()
                 if p1 == None:
                     data1=get_city_data(api_key,c)
@@ -265,9 +272,9 @@ def register():
                     p1=Place(name=c,lat=float(data1[0]["lat"]),lon=float(data1[0]["lon"]))
                     p1.save()
 
-                
+
             hashpass = generate_password_hash(pwd, method='sha256')
-            v = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location, cities=cities)
+            v = User(mail=mail,pwd=hashpass,name=name,birth_date=birth_date,location=location, cities=cities, mail_alert = mail_alert)
             max_id = 0      #assign an id to the user
             for u in User.objects:
                 if u.id > max_id:
@@ -277,6 +284,7 @@ def register():
             return make_response("Bienvenue à MeteoApp", 200)
         else:
             return make_response("Compte existant", 201)
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -337,48 +345,60 @@ def get_notif():
     return jsonify(notifications), 200
 
 
-@app.route('/city/historique',methods=['GET'])
+
+@app.route('/city/historique', methods=['GET'])
 def get_city_hist():
-    ps=[]
-    result=[]
-    user_id=request.form.get('user_id')
-    user=User.objects(id=user_id).first()
-    print(user)
-    #Add all the user's favorites and his own location
-    p=Place.objects(name=user.location)
-    ps.append(p)
+    ps = []
+    user = User.objects(id=request.args.get('user_id')).first()
+    if user is None:
+        return jsonify({'error': 'User not found.'}), 404
+    loc = user.location
 
-    for i in range(len(user.cities)):
-        ps.append(user.cities[i])
+    # Add all the user's favorites and his own location
+    if loc:
+        p = Place.objects(name=loc.lower()).first()
+        if p:
+            ps.append(p)
+    for c in user.cities:
+        p = Place.objects(name=c.lower()).first()
+        if p:
+            ps.append(p)
 
-    #Set the new history of each city
-    for p in ps:
-        data1=get_city_data(api_key,p)
-        date_deb= datetime.date.fromordinal(datetime.date.today().toordinal()-15)
-        history=get_city_history(data1[0]["lat"],data1[0]["lon"],date_deb,datetime.date.today())
-        hc=HistoryCity.objects(city_name=p).first()
-        if hc == None:
-            hc=HistoryCity(city_name=p,data=history["daily"])
-        else:
-            hc.update(data=history)
-        #Prepare the user's result data!
-        result.append({'city':p,'history':history["daily"]})
-    return jsonify(result) , 200
+    for t in ps:
+        date_start = datetime.date.fromordinal(datetime.date.today().toordinal() - 15)
+        history = get_city_history(t.lat, t.lon, date_start, datetime.date.today())
+        data = HistoryCity.objects(city_name=t.name).first()
+        if data is None:
+            for i in range(15):
+                data = HistoryCity(city_name=t.name, date= history['data'][i]['datetime'], weather=history['data'][i]['temp'])
+                data.save()
+    ls = []
+    for i in HistoryCity.objects(city_name=loc.lower()):
+        for j in range(16):
+            if(datetime.date.fromordinal(datetime.date.today().toordinal() - j)==i.date):
+                ls.append(i)
+    # Tri des valeurs en fonction de leur date
+    ls_trie = sorted(ls, key=lambda x: x.date, reverse=True)
+
+    return make_response(jsonify(ls_trie), 200)
+
+
 
 
 # ******************** KAFKA ************************
 #Kafka-confluent Configs 
-producer = KafkaProducer(value_serializer=lambda m: json.dumps(m).encode('utf-8'),bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
+producer = KafkaProducer(value_serializer=lambda m: json.dumps(m).encode('ascii'),bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
                          sasl_mechanism='PLAIN',
                          security_protocol='SASL_SSL',
                          sasl_plain_username='W2W37CHYQAEEQ55R',
                          sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',
                          api_version=(2, 7, 0))
-consumer = KafkaConsumer ('Check_notif', group_id = 'group1',bootstrap_servers = ['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
+consumer = KafkaConsumer ('check_notif', group_id = 'group1',bootstrap_servers = ['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
                           sasl_mechanism='PLAIN',security_protocol='SASL_SSL',sasl_plain_username='W2W37CHYQAEEQ55R',
-                          sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',auto_offset_reset = 'earliest',value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+                          sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',auto_offset_reset = 'earliest',
+                          value_deserializer=lambda m: json.loads(m.decode('ascii')))
 
-consumer.subscribe(['Check_notif'])
+consumer.subscribe(['check_notif'])
 
 #The producer function 
 def produce_weather_data(topic, msg ,location):
@@ -389,30 +409,50 @@ def produce_weather_data(topic, msg ,location):
     producer.flush()
     print(f'Production processing on "{topic}": {msg} , {location}')
 
+
+def check_weather_alerts(weather_data):
+    msg = ""
+    
+    if weather_data["weather"][0]["main"] == "Thunderstorm":
+        msg = "Alert: Thunderstorm detected! Please stay indoors and avoid exposed areas."    
+    elif weather_data["weather"][0]["main"] == "Tornado":
+        msg = " Alert: Tornado detected! Seek shelter immediately in a basement or interior room on the lowest floor."   
+    elif weather_data["weather"][0]["main"] == "Squall":
+        msg = " Alert: Squall detected! Avoid going outside and secure all loose objects."   
+    elif weather_data["weather"][0]["main"] in ["Haze", "Smoke", "Dust", "Ash"]:
+        msg = " Alert: Poor air quality detected! Avoid outdoor activities if possible."    
+    elif weather_data["weather"][0]["main"] in ["Fog", "Mist"]:
+        msg = " Alert: Reduced visibility detected! Use caution while driving and be aware of your surroundings."
+    
+    # Check for extreme temperatures
+    elif weather_data["main"]["temp"] < -10:
+        msg = "Alert: Extremely low temperatures detected! Dress in multiple layers and cover all exposed skin to prevent frostbite. Avoid prolonged outdoor exposure and stay hydrated."
+    elif weather_data["main"]["temp"] > 40:
+        msg = " Alert: Extremely high temperatures detected! Wear light, loose-fitting clothing and a hat to stay cool. Stay hydrated and avoid prolonged outdoor exposure during peak sun hours."
+    
+    # Check for heavy precipitation
+    elif weather_data["weather"][0]["main"] == "Rain":
+            msg = "Alert: Heavy rain detected! Use caution while driving and be aware of potential flooding in low-lying areas."
+    elif weather_data["weather"][0]["main"] == "Snow":
+            msg = "Alert: Heavy snow detected! Use caution while driving and be aware of reduced visibility and slippery road conditions."    
+    else:
+            msg = "No severe weather conditions detected."
+    
+    return msg
+
 #The con job function 
 def check_changes():
     while True:
         #Check all the cities
         ps= Place.objects()
         for p in ps:
-            weather_data = get_weather_data(api_key, p.name)
-            if weather_data is not None:
-                #Prepare the msg! 
-                weatherStatus= weather_data["weather"][0]["main"]
-                if weatherStatus == "Snow":
-                    msg = "Snowy Day Alert !Stay at home, drink something warm! Snowy Day!"
-                elif weatherStatus == "Rain" or weatherStatus=="Shower Rain" or weatherStatus=="Thunderstorm":
-                    msg = "Rainy Day Alert !Don't forget your umbrella! it may rains today!"
-                elif weatherStatus == "Mist":
-                    msg = "Becareful and drive slowly today!"
-                elif weatherStatus== "Clouds":
-                    msg="Grey Day Alert It may be a sad weather today! Be productive"
+            if p.name != None:
+                weather_data = get_weather_data(api_key, p.name)
+                if weather_data is not None:
+                    alert_msg = check_weather_alerts(weather_data)                
+                    produce_weather_data('check_notif',alert_msg,p.name)
                 else:
-                    msg=weatherStatus
-                    #Produce new notification!
-                    produce_weather_data('Check_notif',msg,p.name)
-            else:
-                print('Error retrieving weather data.')
+                    print('Error retrieving weather data.')
         time.sleep(15)
 
 #The consumer function 
@@ -431,13 +471,14 @@ def consume_notification():
                     for u in users:
                         #Create for each user a new notification 
                         #Specific notification for the user's location 
-                        if u.location == message.value["location"]:
+                        loc =u.location
+                        if loc.lower() == message.value["location"]:
                             n=Notification(user_id=u.id,msg=message.value["msg"],location=message.value["location"])
                             n.save()
                         #Specific notification for the user's favorite cities
                         else:
                             for city in u.cities:
-                                if city == message.value["location"]:
+                                if city.lower() == message.value["location"]:
                                     n=Notification(user_id=u.id,msg=message.value["msg"],location=city)
                                     n.save()
             consumer.commit()
@@ -449,10 +490,9 @@ def consume_notification():
         print("closing consumer")
         consumer.close()
 
-
 if __name__ == '__main__':
 
-    # start the producer and consumer  in a separate threads
+    #start the producer and consumer  in a separate threads
     producer_thread = threading.Thread(target=check_changes)
     producer_thread.start()
     consumer_thread = threading.Thread(target=consume_notification)

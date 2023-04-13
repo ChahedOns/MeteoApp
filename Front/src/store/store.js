@@ -16,13 +16,15 @@ const store = new Vuex.Store({
   },
   getters: {
     getWeatherMain(state) {
-      const { temp, feelsLike, description, icon, info } = state.weatherData;
+      const { temp, feelsLike, description, icon, info, lat, lon } = state.weatherData;
       return {
         temp,
         feelsLike,
         description,
         info,
         icon,
+        lat,
+        lon
       };
     },
     getWeatherInfo(state) {
@@ -84,6 +86,8 @@ const store = new Vuex.Store({
           humidity: response.data.main.humidity,
           clouds: response.data.clouds.all,
           country: response.data.sys.country,
+          lon: response.data.coord.lon,
+          lat: response.data.coord.lat,
         };
 
         commit("SET_WEATHER_DATA", newWeatherData);

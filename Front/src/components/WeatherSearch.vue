@@ -50,15 +50,16 @@ export default {
 <style lang="less" scoped>
 .weather-search {
   position: relative;
+  padding-left: 23%;
   .search-control {
-    width: 100%;
+    width: 70%;
     height: 50px;
     border: 2px solid fade(black, 10);
     border-radius: 100px;
     outline: none;
     background-color: transparent;
     font-size: 16px;
-    padding-left: 25px;
+    padding-left: 20px;
     padding-right: 25px;
     transition: all 0.4s;
     &::placeholder {
@@ -85,9 +86,9 @@ export default {
     font-size: 14px;
   }
   .country {
-    position: absolute;
+    position: relative;
     top: 50%;
-    right: 30px;
+    right: 40px;
     transform: translateY(-50%);
     color: var(--grayColor);
   }
