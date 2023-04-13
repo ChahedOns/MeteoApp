@@ -80,8 +80,6 @@ pandas
 passlib
 polib
 prison
-psycopg2
-psycopg2-binary
 pyasn1
 pycparser
 pydot
@@ -90,8 +88,6 @@ PyJWT
 pymongo
 pyOpenSSL
 pyparsing
-PyPDF2
-pypiwin32
 pyrsistent
 pyserial
 python-dateutil
@@ -100,7 +96,6 @@ python-stdnum
 pytz
 pytz-deprecation-shim
 pyusb
-pywin32
 PyYAML
 qrcode
 requests

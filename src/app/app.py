@@ -381,7 +381,7 @@ consumer = KafkaConsumer ('Check_notif', group_id = 'group1',bootstrap_servers =
 consumer.subscribe(['Check_notif'])
 
 #The producer function 
-"""def produce_weather_data(topic, msg ,location):
+def produce_weather_data(topic, msg ,location):
     # Convert data to dictionary
     data={"msg":msg, "location":location}
     # Send data to Kafka topic
@@ -448,15 +448,15 @@ def consume_notification():
     finally:
         print("closing consumer")
         consumer.close()
-"""
+
 
 if __name__ == '__main__':
 
-    """# start the producer and consumer  in a separate threads
+    # start the producer and consumer  in a separate threads
     producer_thread = threading.Thread(target=check_changes)
     producer_thread.start()
     consumer_thread = threading.Thread(target=consume_notification)
-    consumer_thread.start()"""
+    consumer_thread.start()
 
     # start the Flask application
     app.run()

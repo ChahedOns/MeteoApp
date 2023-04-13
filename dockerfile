@@ -1,6 +1,6 @@
 # For more information, please refer to https://aka.ms/vscode-docker-python
-FROM python:3.10-slim
-
+FROM python:3.10.11-bullseye
+#app port
 EXPOSE 5000
 
 # Keeps Python from generating .pyc files in the container
@@ -22,4 +22,4 @@ RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /
 USER appuser
 
 # During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "src.app\app:app"]
+CMD ["--bind", "0.0.0.0:5000", "src.app\app:app"]
