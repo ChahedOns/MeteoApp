@@ -1,10 +1,12 @@
 version: '3.4'
-
 services:
-  meteoapp:
-    image: meteoapp
-    build:
-      context: .
-      dockerfile: ./Dockerfile
+  front-end:
+    build: ./Front
     ports:
-      - 5000:5000
+      - "8080:8080"
+    depends_on:
+      - back-end
+  back-end:
+    build: ./src/app
+    ports:
+      - "5000:5000"
