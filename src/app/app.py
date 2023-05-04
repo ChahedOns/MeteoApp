@@ -340,7 +340,7 @@ def get_notif():
 
     us_id = request.args.get('user_id')
     notifications = []
-    for n in Notification.objects(user_id=us_id):
+    for n in Notification.objects(user_id=us_id).first():
         notifications.append({'message': n.msg, 'location': n.location})
     return jsonify(notifications), 200
 
@@ -450,24 +450,10 @@ def check_changes():
                 weather_data = get_weather_data(api_key, p.name)
                 if weather_data is not None:
                     alert_msg = check_weather_alerts(weather_data)                
-
                     produce_weather_data('check_notif',alert_msg,p.name)
-                    #Check the last notification on that location!
-                    last_notif = Notification.objects(date=datetime.date.today(),location=p.name).first()
-
-                    if last_notif is not None:
-                        if last_notif != alert_msg:                    
-                                #Sending new notifiction with changes
-                            print("Detecting changes!")
-                            produce_weather_data('Check_notif',alert_msg,p.name)
-                        else:
-                            print("no changes detected")
-                    else:
-                        #Produce new notification!
-                        produce_weather_data('Check_notif',alert_msg,p.name)
                 else:
                     print('Error retrieving weather data.')
-        time.sleep(15)
+        time.sleep(5)
 
 #The consumer function 
 def consume_notification():
