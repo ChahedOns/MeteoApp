@@ -390,12 +390,12 @@ def get_city_hist():
 producer = KafkaProducer(value_serializer=lambda m: json.dumps(m).encode('ascii'),bootstrap_servers=['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
                          sasl_mechanism='PLAIN',
                          security_protocol='SASL_SSL',
-                         sasl_plain_username='W2W37CHYQAEEQ55R',
-                         sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',
+                         sasl_plain_username='A4M2HY7ZEQB4ZQZM',
+                         sasl_plain_password='yPAElfU0B9/xD9Xr+duSD5TWyK2cL1JRrcGuGFz2vBYPPkEop24vAZ8SHcDblyDf',
                          api_version=(2, 7, 0))
 consumer = KafkaConsumer ('check_notif', group_id = 'group1',bootstrap_servers = ['pkc-4r297.europe-west1.gcp.confluent.cloud:9092'],
-                          sasl_mechanism='PLAIN',security_protocol='SASL_SSL',sasl_plain_username='W2W37CHYQAEEQ55R',
-                          sasl_plain_password='QhTHq8ufGEqiNZGfUaJVeVkc6FUtCV8zYj8zY7RFrtlVGSE/BnCshVnEBbGyXPX1',auto_offset_reset = 'earliest',
+                          sasl_mechanism='PLAIN',security_protocol='SASL_SSL',sasl_plain_username='A4M2HY7ZEQB4ZQZM',
+                          sasl_plain_password='yPAElfU0B9/xD9Xr+duSD5TWyK2cL1JRrcGuGFz2vBYPPkEop24vAZ8SHcDblyDf',auto_offset_reset = 'earliest',
                           value_deserializer=lambda m: json.loads(m.decode('ascii')))
 
 consumer.subscribe(['check_notif'])
@@ -414,7 +414,6 @@ def check_weather_alerts(weather_data):
     msg = ""
     
     if weather_data["weather"][0]["main"] == "Thunderstorm":
-<<<<<<< HEAD
         msg = "Alert: Thunderstorm detected! Please stay indoors and avoid exposed areas."    
     elif weather_data["weather"][0]["main"] == "Tornado":
         msg = " Alert: Tornado detected! Seek shelter immediately in a basement or interior room on the lowest floor."   
@@ -438,31 +437,6 @@ def check_weather_alerts(weather_data):
             msg = "Alert: Heavy snow detected! Use caution while driving and be aware of reduced visibility and slippery road conditions."    
     else:
             msg = "No severe weather conditions detected."
-=======
-        msg = "⚡⛈️ Alert: Thunderstorm detected! Please stay indoors and avoid exposed areas."    
-    elif weather_data["weather"][0]["main"] == "Tornado":
-        msg = "🌪️ Alert: Tornado detected! Seek shelter immediately in a basement or interior room on the lowest floor."   
-    elif weather_data["weather"][0]["main"] == "Squall":
-        msg = "💨 Alert: Squall detected! Avoid going outside and secure all loose objects."   
-    elif weather_data["weather"][0]["main"] in ["Haze", "Smoke", "Dust", "Ash"]:
-        msg = "🌫️ Alert: Poor air quality detected! Avoid outdoor activities if possible."    
-    elif weather_data["weather"][0]["main"] in ["Fog", "Mist"]:
-        msg = "🌁 Alert: Reduced visibility detected! Use caution while driving and be aware of your surroundings."
-    
-    # Check for extreme temperatures
-    elif weather_data["main"]["temp"] < -10:
-        msg = "🌡️ Alert: Extremely low temperatures detected! Dress in multiple layers and cover all exposed skin to prevent frostbite. Avoid prolonged outdoor exposure and stay hydrated."
-    elif weather_data["main"]["temp"] > 40:
-        msg = "🌡️ Alert: Extremely high temperatures detected! Wear light, loose-fitting clothing and a hat to stay cool. Stay hydrated and avoid prolonged outdoor exposure during peak sun hours."
-    
-    # Check for heavy precipitation
-    elif weather_data["weather"][0]["main"] == "Rain":
-            msg = "🌧️ Alert: Heavy rain detected! Use caution while driving and be aware of potential flooding in low-lying areas."
-    elif weather_data["weather"][0]["main"] == "Snow":
-            msg = "❄️ Alert: Heavy snow detected! Use caution while driving and be aware of reduced visibility and slippery road conditions."    
-    else:
-            msg = "🌤️ No severe weather conditions detected."
->>>>>>> 4f8ff3b27a9ee60ceb64ff9ecc3b23c19e905842
     
     return msg
 
@@ -470,33 +444,16 @@ def check_weather_alerts(weather_data):
 def check_changes():
     while True:
         #Check all the cities
-        Notification.objects().delete()
         ps= Place.objects()
         for p in ps:
             if p.name != None:
                 weather_data = get_weather_data(api_key, p.name)
                 if weather_data is not None:
                     alert_msg = check_weather_alerts(weather_data)                
-<<<<<<< HEAD
                     produce_weather_data('check_notif',alert_msg,p.name)
-=======
-                    #Check the last notification on that location!
-                    last_notif = Notification.objects(date=datetime.date.today(),location=p.name).first()
-
-                    if last_notif is not None:
-                        if last_notif != alert_msg:                    
-                                #Sending new notifiction with changes
-                            print("Detecting changes!")
-                            produce_weather_data('Check_notif',alert_msg,p.name)
-                        else:
-                            print("no changes detected")
-                    else:
-                        #Produce new notification!
-                        produce_weather_data('Check_notif',alert_msg,p.name)
->>>>>>> 4f8ff3b27a9ee60ceb64ff9ecc3b23c19e905842
                 else:
                     print('Error retrieving weather data.')
-        time.sleep(15)
+        time.sleep(60)
 
 #The consumer function 
 def consume_notification():
@@ -535,19 +492,11 @@ def consume_notification():
 
 if __name__ == '__main__':
 
-<<<<<<< HEAD
     #start the producer and consumer  in a separate threads
     producer_thread = threading.Thread(target=check_changes)
     producer_thread.start()
     consumer_thread = threading.Thread(target=consume_notification)
     consumer_thread.start()
-=======
-    # start the producer and consumer  in a separate threads
-    #producer_thread = threading.Thread(target=check_changes)
-    #producer_thread.start()
-    #consumer_thread = threading.Thread(target=consume_notification)
-    #consumer_thread.start()
->>>>>>> 4f8ff3b27a9ee60ceb64ff9ecc3b23c19e905842
 
     # start the Flask application
     app.run()
